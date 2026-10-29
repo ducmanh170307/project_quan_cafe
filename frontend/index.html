@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KiotCafe Chain ERP & POS - Hệ Thống Quản Trị Chuỗi Cà Phê</title>
+    <link rel="stylesheet" href="./src/assets/style.css">
+</head>
+<body>
+
+    <!-- THANH HEADER TOÀN CỤC (PHỤ TRÁCH: TRẦN ĐỨC MẠNH) -->
+    <header class="top-header">
+        <div class="brand-box">
+            <div class="brand-logo">K</div>
+            <div class="brand-title">
+                <h1>KiotCafe Chain ERP & POS</h1>
+                <p id="headerBranchInfo">Đang quản lý: Chi nhánh Cầu Giấy - Hà Nội • Trạng thái: OPEN</p>
+            </div>
+        </div>
+
+        <div class="header-controls">
+            <div class="control-pill">
+                <span>🏢 Chi nhánh:</span>
+                <select id="globalBranchSelect" onchange="ManhModule.onBranchChange()">
+                    <option value="1">Chi nhánh Cầu Giấy - Hà Nội</option>
+                    <option value="2">Chi nhánh Hà Đông - Hà Nội</option>
+                    <option value="3">Chi nhánh Quận 1 - TP.HCM</option>
+                </select>
+            </div>
+
+            <div class="control-pill">
+                <span>👤 Vai trò:</span>
+                <select id="globalRoleSelect" onchange="ManhModule.onRoleChange()">
+                    <option value="ADMIN">👑 Chủ chuỗi / Admin (Toàn quyền)</option>
+                    <option value="CASHIER">💼 Thu ngân (POS & Ca)</option>
+                    <option value="BARISTA">🍹 Pha chế (Màn hình KDS)</option>
+                </select>
+            </div>
+
+            <div id="globalShiftBadge" class="shift-badge shift-closed">
+                <span>🔴 CHƯA MỞ CA POS</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- THANH CHUYỂN TAB 8 LUỒNG NGHIỆP VỤ -->
+    <nav class="nav-tabs">
+        <button class="nav-btn active" onclick="ManhModule.switchTab('tab-branch', this)">🏢 Quản Lý Chuỗi Chi Nhánh</button>
+        <button class="nav-btn" onclick="ManhModule.switchTab('tab-hr', this)"><span class="step-num">1</span> Phân Ca & Chấm Công</button>
+        <button class="nav-btn" onclick="ManhModule.switchTab('tab-shift', this)"><span class="step-num">2</span> Mở Ca & Chốt Ca POS</button>
+        <button class="nav-btn" onclick="ManhModule.switchTab('tab-pos', this)"><span class="step-num">3</span> Bán Hàng Tại Quầy (POS)</button>
+        <button class="nav-btn" onclick="ManhModule.switchTab('tab-kds', this)"><span class="step-num">4</span> Màn Hình Pha Chế (KDS)</button>
+        <button class="nav-btn" onclick="ManhModule.switchTab('tab-online', this)"><span class="step-num">5</span> Khách Đặt Món Online</button>
+        <button class="nav-btn" onclick="ManhModule.switchTab('tab-menu', this)"><span class="step-num">6</span> Quản Lý Menu Chuỗi</button>
+        <button class="nav-btn" onclick="ManhModule.switchTab('tab-inventory', this)"><span class="step-num">7</span> Quản Trị Kho & Nguyên Liệu</button>
+        <button class="nav-btn" onclick="ManhModule.switchTab('tab-promo', this)"><span class="step-num">8</span> Khuyến Mãi & CRM</button>
+    </nav>
+
+    <main class="main-container">
+
+        <!-- [PHẦN CỦA MẠNH] LUỒNG 0: CHI NHÁNH -->
+        <section id="tab-branch" class="tab-pane active">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">➕ Khai Trương Chi Nhánh Mới (Tự Động Khởi Tạo Kho 2000/200)</div>
+                    <div class="role-notice">
+                        ⚡ Khi tạo chi nhánh mới, Backend (<b>branchModel.js</b>) dùng <code>OUTPUT INSERTED.MaChiNhanh</code> tự động bơm toàn bộ nguyên liệu tồn kho ban đầu (2000) và nhân sự mẫu.
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Tên Chi Nhánh Mới:</label>
+                            <input type="text" id="branchName" placeholder="VD: Chi nhánh Đống Đa - Hà Nội">
+                        </div>
+                        <div class="form-group">
+                            <label>Số Điện Thoại (10 số):</label>
+                            <input type="text" id="branchPhone" placeholder="VD: 0988111222">
+                        </div>
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label>Địa Chỉ Chi Nhánh:</label>
+                            <input type="text" id="branchAddress" placeholder="VD: 85 Chùa Bộc, Đống Đa, Hà Nội">
+                        </div>
+                    </div>
+                    <button class="btn btn-green" style="width:100%;" onclick="ManhModule.createBranch()">
+                        ➕ Mở Chi Nhánh & Đồng Bộ Kho Tự Động
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">📋 Danh Sách Chi Nhánh Toàn Chuỗi</div>
+                    <table>
+                        <thead>
+                            <tr><th>Mã CN</th><th>Tên Chi Nhánh</th><th>Địa Chỉ</th><th>SĐT</th><th>Trạng Thái</th></tr>
+                        </thead>
+                        <tbody id="branchTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- [PHẦN CỦA MẠNH] LUỒNG 1: PHÂN CA & CHẤM CÔNG -->
+        <section id="tab-hr" class="tab-pane">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">📅 1A. Lịch Phân Ca Làm Việc (<span class="current-branch-name">Chi nhánh Cầu Giấy - Hà Nội</span>)</div>
+                    <div class="role-notice">👑 <b>Quyền Quản lý:</b> Bạn đang ở chế độ Quản lý/Admin nên có quyền tạo và xếp ca làm việc cho nhân viên.</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Chọn Nhân Viên:</label>
+                            <select id="scheduleStaffSelect"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Chọn Ca Làm:</label>
+                            <select id="scheduleShiftName">
+                                <option value="Ca Sáng (06:30 - 14:30)">Ca Sáng (06:30 - 14:30)</option>
+                                <option value="Ca Chiều (14:30 - 22:30)">Ca Chiều (14:30 - 22:30)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Vị Trí Phân Công:</label>
+                            <select id="schedulePosition">
+                                <option value="Thu ngân">Thu ngân</option>
+                                <option value="Pha chế (Barista)">Pha chế (Barista)</option>
+                                <option value="Quản lý ca">Quản lý ca</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="justify-content: flex-end;">
+                            <button id="btnAssignShift" class="btn btn-green" onclick="ManhModule.assignShift()">➕ Xếp Ca Cho Nhân Viên</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr><th>NHÂN VIÊN</th><th>CA LÀM</th><th>VỊ TRÍ</th><th>TRẠNG THÁI & GHI CHÚ</th></tr>
+                        </thead>
+                        <tbody id="scheduleTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">⏰ 1B. Chấm Công Vào / Tan Ca (GPS / WiFi / QR)</div>
+                    <div class="role-notice">✅ Nhân viên đến ca thực hiện Check-in xác thực GPS/WiFi chi nhánh. Cuối ca bấm Check-out để tính công.</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Nhân Viên Thực Hiện:</label>
+                            <select id="attendanceStaffSelect"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Phương Thức Xác Thực:</label>
+                            <select id="attendanceMethod">
+                                <option value="📍 App (GPS Chi nhánh)">📍 App (GPS Chi nhánh)</option>
+                                <option value="📶 WiFi Nội bộ Quán">📶 WiFi Nội bộ Quán</option>
+                                <option value="📷 Quét mã QR tại Quầy">📷 Quét mã QR tại Quầy</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-green" onclick="ManhModule.checkIn()">📲 Check-In Vào Ca</button>
+                        <button class="btn btn-amber" onclick="ManhModule.checkOut()">🚪 Check-Out Tan Ca</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr><th>NHÂN VIÊN</th><th>GIỜ CHECK-IN</th><th>GIỜ CHECK-OUT</th><th>PHƯƠNG THỨC</th><th>TRẠNG THÁI</th></tr>
+                        </thead>
+                        <tbody id="attendanceTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- [PHẦN CỦA Ý] LUỒNG 2 & 5: MỞ CA, THU CHI & ĐỐI SOÁT KÉT -->
+        <section id="tab-shift" class="tab-pane">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">🔓 Luồng 2: Mở Ca POS & Lập Phiếu Thu/Chi Nội Bộ (Phụ trách: Ý)</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Tiền Mặt Đầu Ca Nạp Vào Két (VNĐ):</label>
+                            <input type="number" id="openShiftMoney" value="1000000">
+                        </div>
+                        <div class="form-group" style="justify-content: flex-end;">
+                            <button class="btn btn-green" onclick="YModule.openShift()">🟢 Mở Ca Làm Việc POS</button>
+                        </div>
+                    </div>
+                    <hr style="border-color: var(--border-color); margin: 16px 0;">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Loại Phiếu Nội Bộ:</label>
+                            <select id="cashflowType">
+                                <option value="CHI">Phiếu Chi (Mua đá, túi nilon...)</option>
+                                <option value="THU">Phiếu Thu (Bổ sung tiền lẻ)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Số Tiền (VNĐ):</label>
+                            <input type="number" id="cashflowAmount" placeholder="VD: 50000">
+                        </div>
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label>Lý Do Thu/Chi:</label>
+                            <input type="text" id="cashflowReason" placeholder="VD: Mua đá viên khẩn cấp">
+                        </div>
+                    </div>
+                    <button class="btn btn-amber" style="width:100%;" onclick="YModule.createCashflow()">📝 Ghi Nhận Phiếu Thu / Chi Nội Bộ</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">🔒 Luồng 5: Chốt Ca & Đối Soát Két Tiền Cuối Ca (Phụ trách: Ý)</div>
+                    <div class="role-notice">Công thức: <b>Tiền Lý Thuyết = Tiền Đầu Ca + Doanh Thu Tiền Mặt + Thu Nội Bộ - Chi Nội Bộ</b></div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Tiền Lý Thuyết Hệ Thống Tính (VNĐ):</label>
+                            <input type="number" id="theoreticalCash" value="1000000" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Tiền Thực Tế Thu Ngân Đếm Cuối Ca (VNĐ):</label>
+                            <input type="number" id="actualCash" placeholder="VD: 2430000">
+                        </div>
+                    </div>
+                    <button class="btn btn-red" style="width:100%;" onclick="YModule.closeShift()">🔒 Đóng Ca & Tính Độ Lệch Két Tiền</button>
+                    <div id="shiftReconcileResult" style="margin-top: 14px; font-weight: 700;"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- [PHẦN CỦA TRÚC] LUỒNG 3: BÁN HÀNG POS -->
+        <section id="tab-pos" class="tab-pane">
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-title">☕ Danh Mục Món Bán Hàng Tại Quầy POS (Phụ trách: Trúc)</div>
+                    <div id="posProductGrid" class="form-grid"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🧾 Giỏ Hàng POS & Thanh Toán</div>
+                    <table>
+                        <thead><tr><th>Tên Món</th><th>SL</th><th>Thành Tiền</th></tr></thead>
+                        <tbody id="posCartBody"></tbody>
+                    </table>
+                    <div style="margin: 14px 0; font-size: 16px; font-weight: 800; color: var(--green-light);">
+                        Tổng thanh toán: <span id="posTotalAmount">0</span> đ
+                    </div>
+                    <button class="btn btn-green" style="width:100%;" onclick="TrucModule.checkoutPosOrder()">💳 Thanh Toán & Đẩy Xuống KDS</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- [PHẦN CỦA TRÚC] LUỒNG 4: MÀN HÌNH PHA CHẾ KDS -->
+        <section id="tab-kds" class="tab-pane">
+            <div class="card">
+                <div class="card-title">🍹 Màn Hình Pha Chế Bếp KDS - Tự Động Trừ Kho BOM (Phụ trách: Trúc)</div>
+                <table>
+                    <thead><tr><th>Mã Đơn</th><th>Chi Tiết Món & Topping</th><th>Trạng Thái Pha Chế</th><th>Thao Tác Barista</th></tr></thead>
+                    <tbody id="kdsQueueBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- [PHẦN CỦA TRÚC] KHÁCH ĐẶT MÓN ONLINE -->
+        <section id="tab-online" class="tab-pane">
+            <div class="card">
+                <div class="card-title">📱 Cổng Khách Đặt Món Online Đồng Bộ Xuống Quầy (Phụ trách: Trúc)</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Tên Khách Hàng:</label>
+                        <input type="text" id="onlineCustomerName" placeholder="VD: Nguyễn Thu Hà">
+                    </div>
+                    <div class="form-group">
+                        <label>Chọn Món Đặt Online:</label>
+                        <select id="onlineProductSelect">
+                            <option value="Bạc Xỉu Đá (Size L) - 39,000đ">Bạc Xỉu Đá (Size L) - 39,000đ</option>
+                            <option value="Trà Đào Cam Sả (Size M) - 45,000đ">Trà Đào Cam Sả (Size M) - 45,000đ</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-green" onclick="TrucModule.submitOnlineOrder()">🚀 Gửi Đơn Online Xuống Bếp KDS</button>
+            </div>
+        </section>
+
+        <!-- [PHẦN CỦA LINH] LUỒNG 6: MENU CHUỖI -->
+        <section id="tab-menu" class="tab-pane">
+            <div class="card">
+                <div class="card-title">📋 Luồng 6: Quản Lý Thực Đơn & Định Mức Công Thức BOM (Phụ trách: Linh)</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Tên Sản Phẩm Mới:</label>
+                        <input type="text" id="newProdName" placeholder="VD: Matcha Latte Kem Cheese">
+                    </div>
+                    <div class="form-group">
+                        <label>Giá Bán (VNĐ):</label>
+                        <input type="number" id="newProdPrice" placeholder="VD: 49000">
+                    </div>
+                </div>
+                <button class="btn btn-green" onclick="LinhModule.addProduct()">➕ Thêm Món Vào Menu Toàn Chuỗi</button>
+            </div>
+        </section>
+
+        <!-- [PHẦN CỦA LINH] LUỒNG 7: KHO VẬN -->
+        <section id="tab-inventory" class="tab-pane">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">📦 Tồn Kho Nguyên Liệu Chi Nhánh (Cảnh Báo Đỏ Khi &lt; 200)</div>
+                    <table>
+                        <thead><tr><th>Nguyên Liệu</th><th>Tồn Hiện Tại</th><th>Tồn Tối Thiểu</th><th>Cảnh Báo</th></tr></thead>
+                        <tbody id="inventoryTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="card">
+                    <div class="card-title">🚚 Điều Chuyển Nguyên Liệu Liên Chi Nhánh (Phụ trách: Linh)</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Nguyên Liệu Chuyển:</label>
+                            <select id="transferItemSelect">
+                                <option value="Sữa tươi thanh trùng">Sữa tươi thanh trùng</option>
+                                <option value="Hạt cà phê Arabica">Hạt cà phê Arabica</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Số Lượng Xuất Chuyển:</label>
+                            <input type="number" id="transferQty" placeholder="VD: 100">
+                        </div>
+                    </div>
+                    <button class="btn btn-amber" style="width:100%;" onclick="LinhModule.transferStock()">🔄 Thực Hiện Điều Chuyển Kho</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- [PHẦN CỦA LINH] LUỒNG 8: KHUYẾN MÃI CRM -->
+        <section id="tab-promo" class="tab-pane">
+            <div class="card">
+                <div class="card-title">🎁 Luồng 8: Kiểm Tra Mã Khuyến Mãi Voucher & Tích Điểm CRM (Phụ trách: Linh)</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Nhập Mã Voucher:</label>
+                        <input type="text" id="promoCodeInput" placeholder="VD: HE2026 hoặc TET2025">
+                    </div>
+                    <div class="form-group" style="justify-content: flex-end;">
+                        <button class="btn btn-green" onclick="LinhModule.verifyPromo()">🏷️ Kiểm Tra & Áp Dụng Voucher</button>
+                    </div>
+                </div>
+                <p id="promoResultMsg" style="margin-top: 10px; font-weight: 700;"></p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- NẠP API CLIENT & 4 MODULE JS CỦA 4 THÀNH VIÊN -->
+    <script src="./src/services/api.js"></script>
+    <script src="./src/modules/manhBranchHr.js"></script>
+    <script src="./src/modules/yShiftCashflow.js"></script>
+    <script src="./src/modules/trucPosKds.js"></script>
+    <script src="./src/modules/linhMenuInventoryPromo.js"></script>
+    <script>
+        window.onload = () => {
+            ManhModule.init();
+            TrucModule.init();
+            LinhModule.init();
+        };
+    </script>
+</body>
+</html>
