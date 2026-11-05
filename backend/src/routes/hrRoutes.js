@@ -1,8 +1,6 @@
-const express = require('express');
-const router = express.Router();
-const hrController = require('../controllers/hrController');
-
-router.get('/', hrController.getHRData);
-router.post('/', hrController.handleHRAction);
-
+// Phụ trách: Mạnh.
+const router = require("express").Router();
+const controller = require("../controllers/hrController");
+router.get("/", controller.getHRData);
+router.post("/", controller.handleHRAction);
 module.exports = router;

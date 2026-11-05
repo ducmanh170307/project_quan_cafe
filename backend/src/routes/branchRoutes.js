@@ -1,8 +1,6 @@
-const express = require('express');
-const router = express.Router();
-const branchController = require('../controllers/branchController');
-
-router.get('/', branchController.getBranches);
-router.post('/', branchController.manageBranch);
-
+// Phụ trách: Mạnh.
+const router = require("express").Router();
+const controller = require("../controllers/branchController");
+router.get("/", controller.getBranches);
+router.post("/", controller.manageBranch);
 module.exports = router;
