@@ -1,0 +1,1104 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>KiotCafe · Quản lý chuỗi cà phê</title>
+    <link rel="stylesheet" href="src/assets/style.css" />
+    <script type="module" src="src/main.js"></script>
+  </head>
+  <body>
+    <div id="notice" role="status" aria-live="polite" hidden></div>
+    <div id="loginPanel" class="login-panel">
+      <form id="loginForm" class="card login-card">
+        <div class="brand-logo">K</div>
+        <h1>KiotCafe</h1>
+        <p>Đăng nhập để quản lý chi nhánh</p>
+        <div class="form-group">
+          <label for="loginPhone">Số điện thoại</label
+          ><input
+            id="loginPhone"
+            autocomplete="username"
+            inputmode="tel"
+            required
+          />
+        </div>
+        <div class="form-group">
+          <label for="loginPin">Mã PIN (6–12 số)</label
+          ><input
+            id="loginPin"
+            type="password"
+            autocomplete="current-password"
+            minlength="6"
+            maxlength="12"
+            required
+          />
+        </div>
+        <button class="btn btn-green" type="submit">Đăng nhập</button>
+        <p id="loginError" class="error" role="alert"></p>
+        <a href="order.html">Khách hàng: đặt món online →</a>
+      </form>
+    </div>
+    <div id="app" hidden>
+      <header class="top-header">
+        <div class="brand-box">
+          <div class="brand-logo">K</div>
+          <div class="brand-title">
+            <h1>KiotCafe Chain ERP & POS</h1>
+            <p id="headerBranchInfo"></p>
+          </div>
+        </div>
+        <div class="header-controls">
+          <div class="control-pill">
+            <label for="globalBranchSelect">Chi nhánh</label
+            ><select
+              id="globalBranchSelect"
+              onchange="UI.run(this, () => ManhModule.onBranchChange())"
+            ></select>
+          </div>
+          <span id="userInfo"></span
+          ><button
+            class="btn"
+            onclick="UI.run(this, () => ManhModule.changePin())"
+          >
+            Đổi PIN</button
+          ><button
+            class="btn btn-amber"
+            onclick="UI.run(this, () => ManhModule.logout())"
+          >
+            Đăng xuất
+          </button>
+          <div
+            id="globalShiftBadge"
+            data-roles="ADMIN,MANAGER,CASHIER"
+            class="shift-badge shift-closed"
+          >
+            Chưa mở ca
+          </div>
+        </div>
+      </header>
+      <nav class="nav-tabs" aria-label="Chức năng">
+        <button
+          data-tab="branch"
+          data-roles="ADMIN,MANAGER"
+          class="nav-btn"
+          onclick="ManhModule.switchTab('branch')"
+        >
+          Chi nhánh</button
+        ><button
+          data-tab="hr"
+          class="nav-btn"
+          onclick="ManhModule.switchTab('hr')"
+        >
+          Nhân sự & chấm công</button
+        ><button
+          data-tab="shift"
+          data-roles="ADMIN,MANAGER,CASHIER"
+          class="nav-btn"
+          onclick="ManhModule.switchTab('shift')"
+        >
+          Mở ca & chốt ca</button
+        ><button
+          data-tab="pos"
+          data-roles="ADMIN,MANAGER,CASHIER"
+          class="nav-btn"
+          onclick="ManhModule.switchTab('pos')"
+        >
+          Bán hàng POS</button
+        ><button
+          data-tab="kds"
+          data-roles="ADMIN,MANAGER,CASHIER,BARISTA"
+          class="nav-btn"
+          onclick="ManhModule.switchTab('kds')"
+        >
+          Pha chế / bếp</button
+        ><button
+          data-tab="menu"
+          data-roles="ADMIN,MANAGER"
+          class="nav-btn"
+          onclick="ManhModule.switchTab('menu')"
+        >
+          Thực đơn & công thức</button
+        ><button
+          data-tab="promo"
+          data-roles="ADMIN,MANAGER"
+          class="nav-btn"
+          onclick="ManhModule.switchTab('promo')"
+        >
+          Khuyến mãi & CRM</button
+        ><button
+          class="nav-btn"
+          onclick="UI.run(this, () => ManhModule.refresh())"
+        >
+          ↻ Tải lại
+        </button>
+      </nav>
+      <main class="main-container">
+        <section id="tab-branch" class="tab-pane">
+          <div class="grid-2">
+            <div class="card" data-roles="ADMIN">
+              <h2 class="card-title">Khai trương chi nhánh</h2>
+              <p class="role-notice">
+                Chi nhánh mới được tạo quầy POS. Tạo tài khoản nhân viên và phân
+                lịch làm việc cho chi nhánh.
+              </p>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Tên chi nhánh</label><input id="branchName" />
+                </div>
+                <div class="form-group">
+                  <label>Số điện thoại</label
+                  ><input id="branchPhone" inputmode="tel" />
+                </div>
+                <div class="form-group full">
+                  <label>Địa chỉ</label><input id="branchAddress" />
+                </div>
+              </div>
+              <button
+                class="btn btn-green"
+                onclick="UI.run(this, () => ManhModule.createBranch())"
+              >
+                Tạo chi nhánh
+              </button>
+            </div>
+            <div class="card">
+              <h2 class="card-title">Danh sách chi nhánh</h2>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Mã</th>
+                      <th>Chi nhánh</th>
+                      <th>Địa chỉ</th>
+                      <th>Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody id="branchTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title">Báo cáo chi nhánh (ngày Việt Nam)</h2>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Từ ngày</label><input id="reportFrom" type="date" />
+              </div>
+              <div class="form-group">
+                <label>Đến ngày</label><input id="reportTo" type="date" />
+              </div>
+            </div>
+            <button
+              class="btn btn-green"
+              onclick="UI.run(this, () => ManhModule.loadReport())"
+            >
+              Xem báo cáo
+            </button>
+            <div id="reportSummary" class="section-gap"></div>
+            <div class="grid-2 section-gap">
+              <div>
+                <h3>Món bán nhiều · tiền hàng trước giảm</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Món</th>
+                      <th>SL</th>
+                      <th>Tiền hàng</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reportProducts"></tbody>
+                </table>
+              </div>
+              <div>
+                <h3>Thu ròng theo phương thức</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Phương thức</th>
+                      <th>Thu ròng</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reportMethods"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section id="tab-hr" class="tab-pane">
+          <div class="card schedule-header">
+            <div>
+              <h2>Lịch làm việc nhân viên</h2>
+              <p class="muted">
+                Chọn vị trí và giờ làm cụ thể cho từng người tại chi nhánh đang
+                quản lý.
+              </p>
+            </div>
+            <div class="schedule-toolbar">
+              <button
+                class="btn"
+                onclick="UI.run(this, () => ManhModule.shiftWeek(-1))"
+              >
+                ← Tuần trước</button
+              ><input
+                id="weekDate"
+                type="date"
+                aria-label="Chọn tuần"
+                onchange="UI.run(this, () => ManhModule.setWeek(this.value))"
+              /><button
+                class="btn"
+                onclick="UI.run(this, () => ManhModule.shiftWeek(1))"
+              >
+                Tuần sau →</button
+              ><button
+                class="btn"
+                onclick="UI.run(this, () => ManhModule.setWeek(UI.today()))"
+              >
+                Tuần này
+              </button>
+            </div>
+          </div>
+          <div id="hrSummary" class="stat-grid section-gap"></div>
+          <div class="grid-2 section-gap">
+            <div class="card" data-roles="ADMIN,MANAGER" id="scheduleEditor">
+              <h2 class="card-title" id="scheduleFormTitle">
+                Phân ca làm việc
+              </h2>
+              <input id="editScheduleId" type="hidden" /><label
+                >Nhân viên được phân công
+                <span class="muted">(chọn một hoặc nhiều người)</span></label
+              >
+              <div class="employee-choices" id="scheduleStaffChoices"></div>
+              <div class="form-grid section-gap">
+                <div class="form-group">
+                  <label>Ngày làm việc</label
+                  ><input id="scheduleDate" type="date" />
+                </div>
+                <div class="form-group">
+                  <label>Vị trí trong ca</label
+                  ><select id="schedulePosition">
+                    <option>Thu ngân</option>
+                    <option>Pha chế</option>
+                    <option>Phục vụ</option>
+                    <option>Quản lý ca</option>
+                    <option>Bếp</option>
+                  </select>
+                </div>
+                <div class="form-group full">
+                  <label>Điền nhanh theo ca mẫu</label
+                  ><select
+                    id="scheduleTemplate"
+                    onchange="ManhModule.useTemplate()"
+                  >
+                    <option value="">Tùy chỉnh giờ</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Giờ bắt đầu</label
+                  ><input
+                    id="scheduleStart"
+                    type="time"
+                    value="06:00"
+                    onchange="ManhModule.customTime()"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>Giờ kết thúc</label
+                  ><input
+                    id="scheduleEnd"
+                    type="time"
+                    value="12:00"
+                    onchange="ManhModule.customTime()"
+                  />
+                </div>
+                <label class="check-label full"
+                  ><input id="scheduleOvernight" type="checkbox" /> Kết thúc vào
+                  ngày hôm sau (ca qua đêm)</label
+                >
+                <div class="form-group full">
+                  <label>Ghi chú công việc</label
+                  ><input
+                    id="scheduleNote"
+                    maxlength="500"
+                    placeholder="Ví dụ: hỗ trợ quầy trong giờ cao điểm"
+                  />
+                </div>
+              </div>
+              <button
+                class="btn btn-green"
+                onclick="UI.run(this, () => ManhModule.saveSchedule())"
+              >
+                Lưu phân ca
+              </button>
+              <button class="btn" onclick="ManhModule.resetSchedule()">
+                Tạo ca mới
+              </button>
+              <p class="muted section-gap" id="scheduleRules"></p>
+            </div>
+            <div class="card">
+              <h2 class="card-title">Chấm công theo lịch</h2>
+              <p class="role-notice">
+                Check-in trước ca tối đa 30 phút. Giờ công, đi trễ và về sớm
+                được tính theo thời điểm thực tế.
+              </p>
+              <div class="form-group">
+                <label>Nhân viên chấm công</label
+                ><select id="attendanceStaffSelect"></select>
+              </div>
+              <div class="toolbar section-gap">
+                <button
+                  class="btn btn-green"
+                  onclick="UI.run(this, () => ManhModule.attendance('checkin'))"
+                >
+                  Check-in</button
+                ><button
+                  class="btn btn-amber"
+                  onclick="
+                    UI.run(this, () => ManhModule.attendance('checkout'))
+                  "
+                >
+                  Check-out
+                </button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nhân viên / vị trí</th>
+                      <th>Vào / ra</th>
+                      <th>Giờ công</th>
+                      <th>Đi trễ / về sớm</th>
+                    </tr>
+                  </thead>
+                  <tbody id="attendanceTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="card section-gap">
+            <div class="card-title">
+              <span id="calendarTitle">Lịch tuần</span>
+              <div class="toolbar">
+                <select
+                  id="calendarEmployee"
+                  aria-label="Lọc nhân viên"
+                  onchange="ManhModule.renderCalendar()"
+                >
+                  <option value="">Tất cả nhân viên</option></select
+                ><select
+                  id="calendarPosition"
+                  aria-label="Lọc vị trí"
+                  onchange="ManhModule.renderCalendar()"
+                >
+                  <option value="">Tất cả vị trí</option>
+                  <option>Thu ngân</option>
+                  <option>Pha chế</option>
+                  <option>Phục vụ</option>
+                  <option>Quản lý ca</option>
+                  <option>Bếp</option>
+                </select>
+              </div>
+            </div>
+            <div class="calendar-wrap">
+              <table class="schedule-calendar" id="scheduleCalendar"></table>
+            </div>
+            <div class="toolbar section-gap" data-roles="ADMIN,MANAGER">
+              <label>Sao chép tuần đang xem sang tuần:</label
+              ><input id="copyWeekTarget" type="date" /><button
+                class="btn btn-amber"
+                onclick="UI.run(this, () => ManhModule.copyWeek())"
+              >
+                Sao chép lịch tuần
+              </button>
+            </div>
+            <p class="muted">
+              Toàn bộ thao tác sao chép sẽ dừng nếu một người bị trùng lịch hoặc
+              vượt giờ.
+            </p>
+            <details class="section-gap">
+              <summary>Danh sách ca và yêu cầu nghỉ</summary>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nhân viên</th>
+                      <th>Ngày / giờ</th>
+                      <th>Vị trí</th>
+                      <th>Trạng thái / ghi chú</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody id="scheduleTableBody"></tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+          <div class="card section-gap" data-roles="ADMIN,MANAGER">
+            <h2 class="card-title" id="staffFormTitle">
+              Nhân viên của chi nhánh
+            </h2>
+            <input id="editStaffId" type="hidden" />
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Họ tên</label><input id="staffName" />
+              </div>
+              <div class="form-group">
+                <label>Số điện thoại đăng nhập</label><input id="staffPhone" />
+              </div>
+              <div class="form-group">
+                <label>PIN (để trống khi sửa để giữ PIN cũ)</label
+                ><input
+                  id="staffPin"
+                  type="password"
+                  autocomplete="new-password"
+                />
+              </div>
+              <div class="form-group">
+                <label>Vai trò tài khoản</label
+                ><select id="staffRole">
+                  <option value="CASHIER">Thu ngân</option>
+                  <option value="BARISTA">Pha chế / bếp</option>
+                  <option value="STAFF">Nhân viên phục vụ</option>
+                  <option value="MANAGER" data-roles="ADMIN">Quản lý</option>
+                  <option value="ADMIN" data-roles="ADMIN">Chủ chuỗi</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Lương theo giờ (đ)</label
+                ><input id="staffWage" type="number" min="0" value="25000" />
+              </div>
+              <div class="form-group">
+                <label>Trạng thái</label
+                ><select id="staffStatus">
+                  <option value="active">Đang làm việc</option>
+                  <option value="inactive">Ngừng làm việc</option>
+                </select>
+              </div>
+            </div>
+            <button
+              class="btn btn-green"
+              onclick="UI.run(this, () => ManhModule.saveStaff())"
+            >
+              Lưu nhân viên
+            </button>
+            <button class="btn" onclick="ManhModule.resetStaff()">
+              Tạo nhân viên mới
+            </button>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mã</th>
+                    <th>Họ tên</th>
+                    <th>Điện thoại</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="staffTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        <section id="tab-shift" class="tab-pane">
+          <div class="grid-2">
+            <div class="card">
+              <h2 class="card-title">Mở ca POS · phần của Ý</h2>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Tiền mặt đầu ca (đ)</label
+                  ><input
+                    type="number"
+                    min="0"
+                    id="openShiftMoney"
+                    value="1000000"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>Ghi chú đầu ca</label><input id="openShiftReason" />
+                </div>
+              </div>
+              <button
+                id="btnOpenShift"
+                class="btn btn-green"
+                onclick="UI.run(this, () => YModule.openShift())"
+              >
+                Mở ca
+              </button>
+              <h3 class="section-gap">Phiếu thu chi nội bộ</h3>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Loại phiếu</label
+                  ><select id="cashflowType">
+                    <option value="CHI">Chi tiền</option>
+                    <option value="THU">Thu tiền</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Số tiền (đ)</label
+                  ><input id="cashflowAmount" type="number" min="1" />
+                </div>
+                <div class="form-group full">
+                  <label>Lý do (bắt buộc)</label><input id="cashflowReason" />
+                </div>
+              </div>
+              <button
+                class="btn btn-amber"
+                onclick="UI.run(this, () => YModule.createCashflow())"
+              >
+                Lưu phiếu
+              </button>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Loại</th>
+                      <th>Số tiền</th>
+                      <th>Lý do</th>
+                      <th>Người tạo</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cashflowTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <h2 class="card-title">Chốt ca & đối soát két</h2>
+              <p class="role-notice">
+                Lý thuyết = Đầu ca + Thu bán hàng tiền mặt − Hoàn tiền mặt + Thu
+                nội bộ − Chi nội bộ.
+              </p>
+              <p id="shiftSummary"></p>
+              <div class="form-grid section-gap">
+                <div class="form-group">
+                  <label>Tiền lý thuyết (đ)</label
+                  ><input id="theoreticalCash" readonly value="0" />
+                </div>
+                <div class="form-group">
+                  <label>Tiền thực đếm (đ)</label
+                  ><input id="actualCash" type="number" min="0" />
+                </div>
+                <div class="form-group full">
+                  <label>Lý do chênh lệch (bắt buộc nếu lệch)</label
+                  ><input id="closeShiftReason" />
+                </div>
+              </div>
+              <button
+                class="btn btn-red"
+                onclick="UI.run(this, () => YModule.closeShift())"
+              >
+                Đóng ca & khóa sổ
+              </button>
+              <p id="shiftReconcileResult" class="section-gap"></p>
+            </div>
+          </div>
+          <div class="card section-gap">
+            <h2 class="card-title">Lịch sử ca</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ca</th>
+                    <th>Thu ngân mở</th>
+                    <th>Mở / đóng</th>
+                    <th>Trạng thái</th>
+                    <th>Đầu ca</th>
+                    <th>Thực đếm</th>
+                    <th>Lệch</th>
+                  </tr>
+                </thead>
+                <tbody id="shiftHistoryBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        <section id="tab-pos" class="tab-pane">
+          <div class="grid-3">
+            <div class="card">
+              <h2 class="card-title">Menu đồ uống & món ăn</h2>
+              <div class="menu-filters">
+                <input
+                  id="posSearch"
+                  placeholder="Tìm tên món..."
+                  oninput="TrucModule.renderPosMenu()"
+                /><select
+                  id="posKind"
+                  aria-label="Loại món"
+                  onchange="TrucModule.renderPosMenu()"
+                >
+                  <option value="">Tất cả</option>
+                  <option value="DO_UONG">Đồ uống</option>
+                  <option value="MON_AN">Món ăn</option>
+                </select>
+              </div>
+              <div id="posProductGrid" class="menu-grid"></div>
+            </div>
+            <div class="card">
+              <h2 class="card-title">Giỏ hàng & thanh toán</h2>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Món / size</th>
+                      <th>SL</th>
+                      <th>Tiền</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="posCartBody"></tbody>
+                </table>
+              </div>
+              <div class="form-grid section-gap">
+                <div class="form-group">
+                  <label>Số điện thoại khách (tích điểm)</label
+                  ><input id="posPhone" />
+                </div>
+                <div class="form-group">
+                  <label>Tên khách</label><input id="posName" />
+                </div>
+                <div class="form-group full">
+                  <label>Mã voucher</label>
+                  <div class="input-action">
+                    <input id="posVoucher" placeholder="Ví dụ: CAFE10" /><button
+                      class="btn btn-green"
+                      onclick="UI.run(this, () => TrucModule.applyVoucher())"
+                    >
+                      Áp dụng</button
+                    ><button
+                      class="btn"
+                      onclick="UI.run(this, () => TrucModule.clearVoucher())"
+                    >
+                      Bỏ mã
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group full">
+                  <label>Ưu đãi có thể chọn</label
+                  ><select
+                    id="posVoucherSelect"
+                    onchange="
+                      UI.run(this, () => TrucModule.pickVoucher(this.value))
+                    "
+                  >
+                    <option value="">Chọn voucher</option>
+                  </select>
+                </div>
+              </div>
+              <p id="posVoucherMessage" class="muted" aria-live="polite"></p>
+              <div class="bill-box">
+                <p>Tiền hàng <span id="posTotalAmount">0</span> đ</p>
+                <p>Giảm voucher <span id="posDiscountAmount">0</span> đ</p>
+                <p class="bill-total">
+                  Cần thanh toán <span id="posPayableAmount">0</span> đ
+                </p>
+                <small id="posQuoteState" class="muted"></small>
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Phương thức thanh toán</label
+                  ><select id="paymentMethod">
+                    <option value="CASH">Tiền mặt</option>
+                    <option value="TRANSFER">Chuyển khoản</option>
+                    <option value="CARD">Thẻ</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Tiền khách đưa (tiền mặt)</label
+                  ><input id="cashTendered" type="number" min="0" />
+                </div>
+                <div class="form-group">
+                  <label>Hình thức nhận</label
+                  ><select id="posFulfillment">
+                    <option value="Dine_In">Tại quán</option>
+                    <option value="Take_Away">Mang đi</option>
+                  </select>
+                </div>
+              </div>
+              <label class="check-label"
+                ><input id="paymentConfirmed" type="checkbox" /> Đã kiểm tra
+                giao dịch thẻ/chuyển khoản</label
+              ><button
+                id="btnCheckout"
+                class="btn btn-green full-width"
+                onclick="UI.run(this, () => TrucModule.checkoutPosOrder())"
+              >
+                Thanh toán & gửi pha chế / bếp
+              </button>
+            </div>
+          </div>
+          <div class="card section-gap">
+            <h2 class="card-title">Đơn hàng & đơn online chờ thanh toán</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mã / thời gian</th>
+                    <th>Khách / món</th>
+                    <th>Tổng</th>
+                    <th>Thanh toán</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="orderTableBody"></tbody>
+              </table>
+            </div>
+            <p class="section-gap">
+              <a href="order.html" class="btn" target="_blank" rel="noopener"
+                >Mở trang đặt món cho khách</a
+              >
+            </p>
+          </div>
+        </section>
+        <section id="tab-kds" class="tab-pane">
+          <div class="card">
+            <h2 class="card-title">Hàng đợi pha chế</h2>
+            <p class="role-notice">
+              Chỉ hiện đơn đã thanh toán. Chọn hoàn tất khi đã chuẩn bị và giao
+              món.
+            </p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Đơn</th>
+                    <th>Món / size / ghi chú</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="kdsQueueBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-menu" class="tab-pane">
+          <div class="grid-2">
+            <div class="card" data-roles="ADMIN">
+              <h2 class="card-title" id="productFormTitle">
+                Thêm đồ uống / món ăn
+              </h2>
+              <input id="editProductId" type="hidden" />
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Tên món</label><input id="newProdName" />
+                </div>
+                <div class="form-group">
+                  <label>Danh mục</label
+                  ><select id="productCategory"></select>
+                </div>
+                <div class="form-group">
+                  <label>Loại món</label
+                  ><select id="productKind" onchange="LinhModule.changeKind()">
+                    <option value="DO_UONG">Đồ uống</option>
+                    <option value="MON_AN">Món ăn</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Size / phần cần lưu</label
+                  ><select id="productSize">
+                    <option>M</option>
+                    <option>L</option>
+                    <option>S</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Giá bán (đ)</label
+                  ><input id="newProdPrice" type="number" min="1" />
+                </div>
+                <div class="form-group">
+                  <label>Trạng thái</label
+                  ><select id="productStatus">
+                    <option value="active">Đang bán</option>
+                    <option value="hidden">Ẩn</option>
+                  </select>
+                </div>
+                <div class="form-group full">
+                  <label>Ảnh món: URL hoặc chọn ảnh từ máy</label
+                  ><input
+                    id="productImage"
+                    placeholder="https://... hoặc tải ảnh bên dưới"
+                    oninput="LinhModule.previewImage()"
+                  /><input
+                    id="productImageFile"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onchange="UI.run(this, () => LinhModule.uploadImage())"
+                  /><small class="muted">JPG, PNG, WebP · tối đa 2 MB</small
+                  ><img
+                    id="productImagePreview"
+                    class="image-preview"
+                    src="src/assets/menu/placeholder.svg"
+                    alt="Ảnh xem trước"
+                  />
+                </div>
+              </div>
+              <button
+                class="btn btn-green"
+                onclick="UI.run(this, () => LinhModule.saveProduct())"
+              >
+                Lưu món
+              </button>
+              <button class="btn" onclick="LinhModule.resetProduct()">
+                Tạo món mới
+              </button>
+            </div>
+            <div class="card">
+              <h2 class="card-title">Menu toàn chuỗi</h2>
+              <div class="input-action">
+                <input id="productSearch" placeholder="Tìm tên món" /><button
+                  class="btn"
+                  onclick="UI.run(this, () => LinhModule.searchProducts())"
+                >
+                  Tìm kiếm
+                </button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Ảnh / món</th>
+                      <th>Size / giá</th>
+                      <th>Trạng thái</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody id="productTableBody"></tbody>
+                </table>
+              </div>
+              <div class="section-gap">
+                <button
+                  class="btn"
+                  onclick="UI.run(this, () => LinhModule.pageProducts(-1))"
+                >
+                  ← Trước
+                </button>
+                <span id="productPage"></span>
+                <button
+                  class="btn"
+                  onclick="UI.run(this, () => LinhModule.pageProducts(1))"
+                >
+                  Sau →
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="card section-gap">
+            <h2 class="card-title">Topping thêm vào đồ uống</h2>
+            <div data-roles="ADMIN">
+              <input id="editToppingId" type="hidden" />
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Tên topping</label><input id="toppingName" />
+                </div>
+                <div class="form-group">
+                  <label>Giá bán một phần (đ)</label
+                  ><input id="toppingPrice" type="number" min="0" />
+                </div>
+                <div class="form-group">
+                  <label>Trạng thái</label
+                  ><select id="toppingStatus">
+                    <option value="active">Đang bán</option>
+                    <option value="hidden">Ẩn</option>
+                  </select>
+                </div>
+              </div>
+              <button
+                class="btn btn-green"
+                onclick="UI.run(this, () => LinhModule.saveTopping())"
+              >
+                Lưu topping
+              </button>
+              <button class="btn" onclick="LinhModule.resetTopping()">
+                Tạo mới
+              </button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Topping</th>
+                    <th>Giá</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="toppingTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-promo" class="tab-pane">
+          <div class="grid-2">
+            <div class="card" data-roles="ADMIN,MANAGER">
+              <h2 class="card-title">Tạo voucher</h2>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Mã voucher</label
+                  ><input id="promoCodeInput" placeholder="Ví dụ: CAFE20" />
+                </div>
+                <div class="form-group">
+                  <label>Tên ưu đãi</label><input id="promoName" />
+                </div>
+                <div class="form-group">
+                  <label>Hình thức giảm</label
+                  ><select id="promoType">
+                    <option value="PERCENT">Phần trăm (%)</option>
+                    <option value="FIXED">Số tiền (đ)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Giá trị giảm</label
+                  ><input id="promoValue" type="number" min="1" />
+                </div>
+                <div class="form-group">
+                  <label>Đơn tối thiểu (đ)</label
+                  ><input id="promoMin" type="number" min="0" value="0" />
+                </div>
+                <div class="form-group">
+                  <label>Giảm tối đa (đ, có thể bỏ trống)</label
+                  ><input id="promoMax" type="number" min="1" />
+                </div>
+                <div class="form-group">
+                  <label>Bắt đầu</label
+                  ><input id="promoStart" type="datetime-local" />
+                </div>
+                <div class="form-group">
+                  <label>Kết thúc</label
+                  ><input id="promoEnd" type="datetime-local" />
+                </div>
+                <div class="form-group">
+                  <label>Phạm vi chi nhánh</label
+                  ><select id="promoBranch">
+                    <option value="">Toàn chuỗi</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Giới hạn lượt (bỏ trống: không giới hạn)</label
+                  ><input id="promoLimit" type="number" min="1" />
+                </div>
+              </div>
+              <button
+                class="btn btn-green"
+                onclick="UI.run(this, () => YModule.createPromo())"
+              >
+                Tạo voucher
+              </button>
+              <p class="role-notice section-gap">
+                Voucher được kiểm tra khi áp dụng và khi thu tiền. Xem trước
+                không ghi lượt sử dụng.
+              </p>
+            </div>
+            <div class="card">
+              <h2 class="card-title">Voucher đang quản lý</h2>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Mã / ưu đãi</th>
+                      <th>Giảm / đơn tối thiểu</th>
+                      <th>Phạm vi / hạn</th>
+                      <th>Lượt</th>
+                      <th>Trạng thái</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody id="promoTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="card section-gap">
+            <h2 class="card-title">Khách thành viên</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Khách</th>
+                    <th>Điện thoại</th>
+                    <th>Điểm</th>
+                    <th>Chi tiêu</th>
+                    <th>Hạng</th>
+                  </tr>
+                </thead>
+                <tbody id="customerTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <dialog id="receiptDialog">
+      <div id="receiptContent"></div>
+      <div class="dialog-controls">
+        <button class="btn btn-green" onclick="window.print()">
+          In hóa đơn
+        </button>
+        <button
+          class="btn"
+          onclick="document.getElementById('receiptDialog').close()"
+        >
+          Đóng
+        </button>
+      </div>
+    </dialog>
+    <dialog id="onlinePaymentDialog">
+      <h2>Thu tiền đơn online</h2>
+      <input id="onlinePayId" type="hidden" />
+      <p id="onlinePayTitle"></p>
+      <div class="form-group section-gap">
+        <label>Voucher cho đơn này</label>
+        <div class="input-action">
+          <input id="onlinePayVoucher" /><button
+            class="btn"
+            onclick="UI.run(this, () => TrucModule.applyOnlineVoucher())"
+          >
+            Áp dụng
+          </button>
+        </div>
+      </div>
+      <p id="onlinePayVoucherMessage" class="muted"></p>
+      <div class="bill-box">
+        <p>Tiền hàng <span id="onlinePaySubtotal">0</span> đ</p>
+        <p>Giảm giá <span id="onlinePayDiscount">0</span> đ</p>
+        <p class="bill-total">
+          Thanh toán <span id="onlinePayTotal">0</span> đ
+        </p>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Phương thức</label
+          ><select id="onlinePayMethod">
+            <option value="CASH">Tiền mặt</option>
+            <option value="TRANSFER">Chuyển khoản</option>
+            <option value="CARD">Thẻ</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tiền khách đưa</label
+          ><input id="onlinePayTendered" type="number" min="0" />
+        </div>
+      </div>
+      <label class="check-label"
+        ><input id="onlinePayConfirmed" type="checkbox" /> Đã kiểm tra giao dịch
+        thẻ/chuyển khoản</label
+      >
+      <div class="toolbar section-gap">
+        <button
+          class="btn btn-green"
+          onclick="UI.run(this, () => TrucModule.confirmOnlinePayment())"
+        >
+          Xác nhận thu tiền</button
+        ><button
+          class="btn"
+          onclick="document.getElementById('onlinePaymentDialog').close()"
+        >
+          Đóng
+        </button>
+      </div>
+    </dialog>
+  </body>
+</html>
