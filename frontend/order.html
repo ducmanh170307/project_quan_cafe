@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>KiotCafe · Đặt đồ uống và món ăn</title>
+    <link rel="stylesheet" href="src/assets/style.css" />
+    <script type="module" src="src/customer.js"></script>
+  </head>
+  <body>
+    <div id="notice" role="status" hidden></div>
+    <main class="order-page">
+      <header>
+        <h1>☕ KiotCafe</h1>
+        <p>Đồ uống yêu thích, bánh ngọt và món ăn cho ngày của bạn.</p>
+        <p class="section-gap"><a href="/">Đăng nhập nhân viên →</a></p>
+      </header>
+      <div class="form-group">
+        <label for="branch">Chi nhánh nhận đơn</label
+        ><select
+          id="branch"
+          onchange="UI.run(this, () => Customer.loadMenu())"
+        ></select>
+        <p id="branchStatus" class="muted"></p>
+      </div>
+      <div class="grid-2 section-gap">
+        <div class="card">
+          <h2 class="card-title">Menu</h2>
+          <div class="menu-filters">
+            <input
+              id="menuSearch"
+              placeholder="Tìm món..."
+              oninput="Customer.renderMenu()"
+            /><select
+              id="menuKind"
+              onchange="Customer.renderMenu()"
+              aria-label="Loại món"
+            >
+              <option value="">Tất cả</option>
+              <option value="DO_UONG">Đồ uống</option>
+              <option value="MON_AN">Món ăn</option>
+            </select>
+          </div>
+          <div class="menu-grid" id="menu"></div>
+        </div>
+        <div class="card">
+          <h2 class="card-title">Đơn của bạn</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Món</th>
+                  <th>SL</th>
+                  <th>Tiền</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="cart"></tbody>
+            </table>
+          </div>
+          <div class="form-grid section-gap">
+            <div class="form-group">
+              <label>Tên của bạn</label
+              ><input id="customerName" autocomplete="name" maxlength="100" />
+            </div>
+            <div class="form-group">
+              <label>Số điện thoại</label
+              ><input id="customerPhone" autocomplete="tel" inputmode="tel" />
+            </div>
+            <div class="form-group">
+              <label>Nhận món</label
+              ><select id="fulfillment">
+                <option value="Take_Away">Đến lấy tại quầy</option>
+                <option value="Delivery">Giao tận nơi</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Voucher có thể chọn</label
+              ><select
+                id="voucherSelect"
+                onchange="UI.run(this, () => Customer.pickVoucher(this.value))"
+              >
+                <option value="">Chọn voucher</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label>Mã voucher</label>
+              <div class="input-action">
+                <input id="voucher" placeholder="CAFE10" /><button
+                  class="btn btn-green"
+                  onclick="UI.run(this, () => Customer.applyVoucher())"
+                >
+                  Áp dụng</button
+                ><button
+                  class="btn"
+                  onclick="UI.run(this, () => Customer.clearVoucher())"
+                >
+                  Bỏ mã
+                </button>
+              </div>
+            </div>
+            <div class="form-group full">
+              <label>Địa chỉ khi giao hàng</label
+              ><input
+                id="address"
+                autocomplete="street-address"
+                maxlength="300"
+              />
+            </div>
+          </div>
+          <p id="voucherMessage" class="muted" aria-live="polite"></p>
+          <div class="bill-box">
+            <p>Tiền hàng <span id="total">0</span> đ</p>
+            <p>Giảm voucher <span id="discount">0</span> đ</p>
+            <p class="bill-total">
+              Cần thanh toán <span id="payable">0</span> đ
+            </p>
+            <small id="quoteState" class="muted"></small>
+          </div>
+          <p class="muted">
+            Thanh toán tại quầy để bắt đầu chuẩn bị món. Voucher được kiểm tra
+            lại lúc thu tiền. Cửa hàng liên hệ xác nhận phí nếu cần giao hàng.
+          </p>
+          <button
+            id="btnSubmitOrder"
+            class="btn btn-green full-width section-gap"
+            onclick="UI.run(this, () => Customer.submit())"
+          >
+            Gửi đơn · thanh toán tại quầy
+          </button>
+          <p id="orderResult" class="section-gap" aria-live="polite"></p>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
