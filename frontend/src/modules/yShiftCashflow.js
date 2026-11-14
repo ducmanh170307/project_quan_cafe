@@ -1,11 +1,13 @@
 import { ApiClient, UI } from "../services/api.js";
 import { ManhModule } from "./manhBranchHr.js";
-/* Ý: ca POS, phiếu thu chi, đối soát và Voucher/CRM. */
+/* Như Ý: ca POS, thu chi và két. Linh: voucher và khách thành viên. */
 const YModule = {
+  lastClosed: null,
   activeShift: null,
   theoreticalMoney: 0,
   reset() {
     this.activeShift = null;
+    this.lastClosed = null;
     this.theoreticalMoney = 0;
     UI.el("theoreticalCash").value = 0;
     UI.el("globalShiftBadge").textContent = "Chưa xác định trạng thái ca";
@@ -14,20 +16,36 @@ const YModule = {
     UI.el("shiftHistoryBody").innerHTML = "";
     UI.el("shiftSummary").textContent = "";
     UI.el("shiftReconcileResult").textContent = "";
+    UI.el("differencePreview").textContent = "";
+    delete UI.el("openShiftMoney").dataset.touched;
+    UI.el("shiftBanner").textContent = "Đang tải trạng thái ca...";
+    UI.el("shiftBanner").className = "status-banner";
+    UI.el("posShiftWarning").hidden = true;
   },
+  /*
+   * Logic mở/chốt ca (làm rõ theo góp ý của thầy):
+   *  - Mỗi chi nhánh chỉ có 1 ca mở tại một thời điểm.
+   *  - Chưa có ca mở: chỉ hiện bước ① Mở ca; bước ② ③ và POS bị khóa.
+   *  - Đang có ca mở: ẩn form mở ca, cho phép thu chi, bán hàng và chốt ca.
+   *  - Tiền đầu ca nên bằng tiền thực đếm của ca trước; nếu lệch phải ghi lý do.
+   */
   hydrate(data) {
     this.activeShift = data.activeShift;
+    this.lastClosed =
+      data.historyShifts.find((s) => s.TrangThai === "closed") || null;
     this.theoreticalMoney = Number(data.theoreticalCash);
-    const badge = UI.el("globalShiftBadge");
-    badge.textContent = this.activeShift
-      ? `Ca #${this.activeShift.MaPhienCa} · ${this.activeShift.TenThuNgan}`
+    const shift = this.activeShift,
+      badge = UI.el("globalShiftBadge");
+    badge.textContent = shift
+      ? `Ca #${shift.MaPhienCa} · ${shift.TenThuNgan}`
       : "Chưa mở ca POS";
-    badge.className =
-      "shift-badge " + (this.activeShift ? "shift-open" : "shift-closed");
+    badge.className = "shift-badge " + (shift ? "shift-open" : "shift-closed");
     UI.el("theoreticalCash").value = this.theoreticalMoney;
-    UI.el("shiftSummary").textContent = this.activeShift
-      ? `Đầu ca: ${UI.money(this.activeShift.TienMatDauCa)}đ · Thu tiền mặt: ${UI.money(this.activeShift.TongThuTienMat)}đ · Hoàn tiền mặt: ${UI.money(this.activeShift.TongHoanTienMat)}đ`
-      : "Mở ca trước khi bán hàng hoặc lập phiếu.";
+    UI.el("shiftSummary").textContent = shift
+      ? `Đầu ca: ${UI.money(shift.TienMatDauCa)}đ · Thu tiền mặt: ${UI.money(shift.TongThuTienMat)}đ · Hoàn tiền mặt: ${UI.money(shift.TongHoanTienMat)}đ · Thu nội bộ: ${UI.money(shift.TongThuNoiBo)}đ · Chi nội bộ: ${UI.money(shift.TongChiNoiBo)}đ`
+      : "Chưa có ca đang mở để chốt.";
+    this.renderShiftState();
+    this.previewDifference();
     UI.el("cashflowTableBody").innerHTML =
       data.cashflows
         .map(
@@ -43,12 +61,67 @@ const YModule = {
         )
         .join("") || UI.empty(7);
   },
+  renderShiftState() {
+    const shift = this.activeShift,
+      last = this.lastClosed,
+      banner = UI.el("shiftBanner");
+    banner.className =
+      "status-banner " + (shift ? "status-open" : "status-closed");
+    banner.textContent = shift
+      ? `Ca #${shift.MaPhienCa} đang mở · thu ngân ${shift.TenThuNgan} · mở lúc ${UI.date(shift.ThoiGianMo)}. Có thể bán hàng, lập phiếu thu chi và chốt ca.`
+      : "Chi nhánh chưa có ca mở. Hãy mở ca (bước ①) trước khi bán hàng.";
+    UI.el("posShiftWarning").hidden = !!shift;
+    // Thanh bước: bước đã xong / đang làm / chưa tới.
+    const state = shift
+      ? { open: "done", cash: "current", close: "current" }
+      : { open: "current", cash: "todo", close: "todo" };
+    UI.el("shiftSteps")
+      .querySelectorAll("li")
+      .forEach((li) => (li.className = state[li.dataset.step]));
+    UI.el("openShiftForm").hidden = !!shift;
+    UI.el("cashForm").hidden = !shift;
+    UI.el("closeForm").hidden = !shift;
+    UI.el("openShiftHint").textContent = shift
+      ? `Ca #${shift.MaPhienCa} đang mở nên không thể mở thêm. Muốn mở ca mới, hãy chốt ca hiện tại ở bước ③.`
+      : last
+        ? `Ca trước (#${last.MaPhienCa}) chốt két ${UI.money(last.TienMatThucTeCuoiCa)}đ. Tiền đầu ca nên đúng số này; nếu khác, bắt buộc ghi lý do.`
+        : "Chưa có ca nào trước đó. Nhập số tiền mặt có trong két lúc bắt đầu.";
+    UI.el("cashHint").textContent = shift
+      ? "Ghi mọi khoản thu/chi tiền mặt ngoài bán hàng (mua đá, đổi tiền lẻ...)."
+      : "Cần mở ca trước khi lập phiếu thu chi.";
+    // Gợi ý tiền đầu ca = tiền thực đếm cuối ca trước (không ghi đè nếu người dùng đã gõ).
+    const money = UI.el("openShiftMoney");
+    if (!shift && last && !money.dataset.touched)
+      money.value = Number(last.TienMatThucTeCuoiCa ?? 0);
+  },
+  previewDifference() {
+    const box = UI.el("differencePreview"),
+      raw = UI.value("actualCash");
+    if (!this.activeShift || raw === "") {
+      box.textContent = "";
+      return;
+    }
+    const diff = Number(raw) - this.theoreticalMoney;
+    box.textContent =
+      diff === 0
+        ? "Khớp với tiền lý thuyết."
+        : `Chênh lệch ${diff > 0 ? "thừa" : "thiếu"} ${UI.money(Math.abs(diff))}đ — cần ghi lý do.`;
+  },
   requireShift() {
     if (!this.activeShift)
       throw new Error("Vui lòng mở ca POS tại chi nhánh đang chọn.");
     return this.activeShift.MaPhienCa;
   },
   async openShift() {
+    const last = this.lastClosed;
+    if (
+      last &&
+      Number(UI.value("openShiftMoney")) !== Number(last.TienMatThucTeCuoiCa) &&
+      !UI.value("openShiftReason")
+    )
+      throw new Error(
+        `Tiền đầu ca khác tiền chốt ca trước (${UI.money(last.TienMatThucTeCuoiCa)}đ). Hãy ghi lý do lệch.`,
+      );
     const r = await ApiClient.post("/shifts/open", {
       MaChiNhanh: ManhModule.currentBranchId,
       TienMatDauCa: UI.value("openShiftMoney"),
@@ -80,6 +153,8 @@ const YModule = {
       `Lý thuyết ${UI.money(r.theoreticalCash)}đ · Thực đếm ${UI.money(r.actualCash)}đ · Chênh lệch ${UI.money(r.difference)}đ`;
     UI.notify(r.message);
     UI.el("actualCash").value = "";
+    delete UI.el("openShiftMoney").dataset.touched;
+    UI.el("differencePreview").textContent = "";
   },
   async createPromo() {
     const start = UI.value("promoStart"),

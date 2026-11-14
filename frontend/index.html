@@ -549,94 +549,87 @@
           </div>
         </section>
         <section id="tab-shift" class="tab-pane">
-          <div class="grid-2">
-            <div class="card">
-              <h2 class="card-title">Mở ca POS · phần của Ý</h2>
+          <div id="shiftBanner" class="status-banner" role="status"></div>
+          <ol class="step-bar" id="shiftSteps">
+            <li data-step="open">① Mở ca</li>
+            <li data-step="cash">② Thu chi trong ca</li>
+            <li data-step="close">③ Chốt ca</li>
+          </ol>
+          <div class="card section-gap" id="shiftStepOpen">
+            <h2 class="card-title">① Mở ca POS</h2>
+            <p id="openShiftHint" class="role-notice"></p>
+            <div id="openShiftForm">
               <div class="form-grid">
                 <div class="form-group">
                   <label>Tiền mặt đầu ca (đ)</label
-                  ><input
-                    type="number"
-                    min="0"
-                    id="openShiftMoney"
-                    value="1000000"
-                  />
+                  ><input type="number" min="0" id="openShiftMoney" value="1000000" oninput="this.dataset.touched=1" />
                 </div>
                 <div class="form-group">
-                  <label>Ghi chú đầu ca</label><input id="openShiftReason" />
+                  <label>Lý do lệch / ghi chú đầu ca</label
+                  ><input id="openShiftReason" placeholder="Bắt buộc nếu khác tiền chốt ca trước" />
                 </div>
               </div>
-              <button
-                id="btnOpenShift"
-                class="btn btn-green"
-                onclick="UI.run(this, () => YModule.openShift())"
-              >
-                Mở ca
-              </button>
-              <h3 class="section-gap">Phiếu thu chi nội bộ</h3>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label>Loại phiếu</label
-                  ><select id="cashflowType">
-                    <option value="CHI">Chi tiền</option>
-                    <option value="THU">Thu tiền</option>
-                  </select>
+              <button id="btnOpenShift" class="btn btn-green" onclick="UI.run(this, () => YModule.openShift())">Mở ca</button>
+            </div>
+          </div>
+          <div class="grid-2 section-gap">
+            <div class="card" id="shiftStepCash">
+              <h2 class="card-title">② Phiếu thu chi nội bộ</h2>
+              <p id="cashHint" class="role-notice"></p>
+              <div id="cashForm">
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>Loại phiếu</label
+                    ><select id="cashflowType">
+                      <option value="CHI">Chi tiền</option>
+                      <option value="THU">Thu tiền</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Số tiền (đ)</label
+                    ><input id="cashflowAmount" type="number" min="1" />
+                  </div>
+                  <div class="form-group full">
+                    <label>Lý do (bắt buộc)</label><input id="cashflowReason" />
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label>Số tiền (đ)</label
-                  ><input id="cashflowAmount" type="number" min="1" />
-                </div>
-                <div class="form-group full">
-                  <label>Lý do (bắt buộc)</label><input id="cashflowReason" />
-                </div>
+                <button class="btn btn-amber" onclick="UI.run(this, () => YModule.createCashflow())">Lưu phiếu</button>
               </div>
-              <button
-                class="btn btn-amber"
-                onclick="UI.run(this, () => YModule.createCashflow())"
-              >
-                Lưu phiếu
-              </button>
               <div class="table-wrap">
                 <table>
                   <thead>
-                    <tr>
-                      <th>Loại</th>
-                      <th>Số tiền</th>
-                      <th>Lý do</th>
-                      <th>Người tạo</th>
-                    </tr>
+                    <tr><th>Loại</th><th>Số tiền</th><th>Lý do</th><th>Người tạo</th></tr>
                   </thead>
                   <tbody id="cashflowTableBody"></tbody>
                 </table>
               </div>
             </div>
-            <div class="card">
-              <h2 class="card-title">Chốt ca & đối soát két</h2>
+            <div class="card" id="shiftStepClose">
+              <h2 class="card-title">③ Chốt ca & đối soát két</h2>
               <p class="role-notice">
                 Lý thuyết = Đầu ca + Thu bán hàng tiền mặt − Hoàn tiền mặt + Thu
-                nội bộ − Chi nội bộ.
+                nội bộ − Chi nội bộ. Phải hoàn tất hết đơn ở màn hình Pha chế
+                trước khi chốt.
               </p>
               <p id="shiftSummary"></p>
-              <div class="form-grid section-gap">
-                <div class="form-group">
-                  <label>Tiền lý thuyết (đ)</label
-                  ><input id="theoreticalCash" readonly value="0" />
+              <div id="closeForm">
+                <div class="form-grid section-gap">
+                  <div class="form-group">
+                    <label>Tiền lý thuyết (đ)</label
+                    ><input id="theoreticalCash" readonly value="0" />
+                  </div>
+                  <div class="form-group">
+                    <label>Tiền thực đếm (đ)</label
+                    ><input id="actualCash" type="number" min="0" oninput="YModule.previewDifference()" />
+                  </div>
+                  <div class="form-group full">
+                    <label>Lý do chênh lệch (bắt buộc nếu lệch)</label
+                    ><input id="closeShiftReason" />
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label>Tiền thực đếm (đ)</label
-                  ><input id="actualCash" type="number" min="0" />
-                </div>
-                <div class="form-group full">
-                  <label>Lý do chênh lệch (bắt buộc nếu lệch)</label
-                  ><input id="closeShiftReason" />
-                </div>
+                <p id="differencePreview" class="muted" aria-live="polite"></p>
+                <button class="btn btn-red" onclick="UI.run(this, () => YModule.closeShift())">Đóng ca & khóa sổ</button>
               </div>
-              <button
-                class="btn btn-red"
-                onclick="UI.run(this, () => YModule.closeShift())"
-              >
-                Đóng ca & khóa sổ
-              </button>
               <p id="shiftReconcileResult" class="section-gap"></p>
             </div>
           </div>
@@ -661,6 +654,10 @@
           </div>
         </section>
         <section id="tab-pos" class="tab-pane">
+          <div id="posShiftWarning" class="status-banner status-closed" hidden>
+            Chi nhánh chưa mở ca POS nên chưa thể thanh toán.
+            <button class="btn small-btn" onclick="ManhModule.switchTab('shift')">Đi tới mở ca →</button>
+          </div>
           <div class="grid-3">
             <div class="card">
               <h2 class="card-title">Menu đồ uống & món ăn</h2>
