@@ -816,3 +816,90 @@ summary {
     font-size: 12px;
   }
 }
+
+/* Phân ca và chấm công */
+#tab-hr .pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+#tab-hr .pill {
+  background: var(--bg-input);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font: inherit;
+  position: relative;
+}
+#tab-hr .pill:hover {
+  border-color: var(--green-light);
+}
+#tab-hr .pill.active {
+  background: var(--green-primary);
+  border-color: var(--green-light);
+  font-weight: bold;
+}
+#tab-hr .subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 0;
+  border-bottom: 1px solid var(--border-color);
+}
+#tab-hr .subtab {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 10px 16px;
+  cursor: pointer;
+  font: inherit;
+  border-bottom: 3px solid transparent;
+}
+#tab-hr .subtab.active {
+  color: var(--green-light);
+  border-bottom-color: var(--green-light);
+  font-weight: bold;
+}
+#tab-hr .sub-panel {
+  display: none;
+}
+#tab-hr .sub-panel.active {
+  display: block;
+}
+#tab-hr .my-status {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg-input);
+  border-left: 4px solid var(--text-muted);
+}
+#tab-hr .my-on {
+  border-left-color: var(--green-light);
+}
+#tab-hr .my-wait {
+  border-left-color: var(--amber-accent);
+}
+#tab-hr .pill input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+#tab-hr .pill:has(input:checked) {
+  background: var(--green-primary);
+  border-color: var(--green-light);
+  font-weight: bold;
+}
+#tab-hr .pill:has(input:focus-visible) {
+  outline: 2px solid var(--green-light);
+}
+#tab-hr .selected-summary {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--green-light);
+  background: var(--bg-input);
+  border-radius: 6px;
+  line-height: 1.6;
+  min-height: 1.2em;
+}
