@@ -1,3 +1,4 @@
+// Như Ý phụ trách kiểm thử.
 const fs = require("node:fs"),
   path = require("node:path"),
   { spawnSync } = require("node:child_process");

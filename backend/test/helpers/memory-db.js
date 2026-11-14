@@ -1,3 +1,4 @@
+// Như Ý phụ trách kiểm thử.
 // Test double thay tầng SQL; các model thật vẫn chạy quy tắc giao dịch/giá/voucher/lịch.
 function memoryDB(t, db, products) {
   let state = {

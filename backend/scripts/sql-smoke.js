@@ -1,3 +1,4 @@
+// Như Ý phụ trách kiểm thử.
 // Chỉ tạo/xóa database test với tên ngẫu nhiên do script tự sinh.
 const fs = require("node:fs"),
   path = require("node:path"),
