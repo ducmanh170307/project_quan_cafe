@@ -1,3 +1,4 @@
+// Như Ý phụ trách kiểm thử.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const {

@@ -1,3 +1,4 @@
+// Như Ý phụ trách kiểm thử.
 const { test } = require("node:test"),
   assert = require("node:assert/strict");
 const images = require("../src/lib/menuImage");

@@ -1,3 +1,4 @@
+// Như Ý phụ trách kiểm thử.
 const { test, before, after, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
 process.env.NODE_ENV = "test";
