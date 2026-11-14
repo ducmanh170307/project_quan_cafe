@@ -236,6 +236,32 @@ async function writePlans(tx, plans, actor, branch) {
   }
   return result;
 }
+/** Các ngày cần phân ca: một ngày (NgayLamViec) hoặc khoảng TuNgay..DenNgay lọc theo CacThu (1=Thứ 2 ... 7=Chủ nhật). */
+function shiftDates(data) {
+  if (!data.TuNgay && !data.DenNgay) return [v.date(data.NgayLamViec)];
+  const from = v.date(data.TuNgay),
+    to = v.date(data.DenNgay);
+  assert(to >= from, 400, "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.");
+  const span = (Date.parse(to) - Date.parse(from)) / 86400000 + 1;
+  assert(span <= 31, 400, "Chỉ phân ca tối đa 31 ngày mỗi lần.");
+  const weekdays = (
+    Array.isArray(data.CacThu) ? data.CacThu : [1, 2, 3, 4, 5, 6, 7]
+  ).map(Number);
+  assert(
+    weekdays.length > 0 &&
+      weekdays.every((d) => Number.isInteger(d) && d >= 1 && d <= 7),
+    400,
+    "Chọn ít nhất một thứ trong tuần.",
+  );
+  const dates = [];
+  for (let i = 0; i < span; i++) {
+    const day = schedule.addDays(from, i),
+      weekday = ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+    if (weekdays.includes(weekday)) dates.push(day);
+  }
+  assert(dates.length > 0, 400, "Khoảng ngày đã chọn không có thứ nào được tick.");
+  return dates;
+}
 async function planAction(data, actor, branch) {
   access.role(actor, access.managers);
   if (data.action === "copy_week") {
@@ -290,7 +316,10 @@ async function planAction(data, actor, branch) {
       };
     });
   }
-  const norm = schedule.normalize(data),
+  const dates = data.action === "assign_shift" ? shiftDates(data) : null,
+    norms = (dates || [data.NgayLamViec]).map((d) =>
+      schedule.normalize({ ...data, NgayLamViec: d }),
+    ),
     ids = data.NhanVienIds ?? [data.MaNhanVien];
   const employees = v.list(ids, "Nhân viên", 100).map((x) => v.id(x));
   assert(
@@ -316,7 +345,7 @@ async function planAction(data, actor, branch) {
     }
     const saved = await writePlans(
       tx,
-      employees.map((employee) => ({ employee, norm, id })),
+      employees.flatMap((employee) => norms.map((norm) => ({ employee, norm, id }))),
       actor,
       branch,
     );
@@ -324,7 +353,7 @@ async function planAction(data, actor, branch) {
       shifts: saved,
       message: id
         ? "Đã sửa lịch làm việc."
-        : `Đã phân ca cho ${saved.length} nhân viên.`,
+        : `Đã tạo ${saved.length} ca (${employees.length} nhân viên × ${norms.length} ngày).`,
     };
   });
 }
@@ -468,4 +497,4 @@ async function action(data, actor) {
   }
   assert(false, 400, "Thao tác nhân sự không hợp lệ.");
 }
-module.exports = { getHRByBranch, action, writePlans };
+module.exports = { getHRByBranch, action, writePlans, shiftDates };

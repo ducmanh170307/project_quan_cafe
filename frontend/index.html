@@ -259,8 +259,13 @@
             </div>
           </div>
           <div id="hrSummary" class="stat-grid section-gap"></div>
-          <div class="grid-2 section-gap">
-            <div class="card" data-roles="ADMIN,MANAGER" id="scheduleEditor">
+          <div class="subtabs" id="hrSubtabs" role="tablist" aria-label="Các phần của nhân sự">
+            <button class="subtab active" data-sub="schedule" onclick="ManhModule.switchSub('schedule')">① Lịch phân ca</button>
+            <button class="subtab" data-sub="attendance" onclick="ManhModule.switchSub('attendance')">② Chấm công</button>
+            <button class="subtab" data-sub="accounts" data-roles="ADMIN,MANAGER" onclick="ManhModule.switchSub('accounts')">③ Tài khoản nhân viên</button>
+          </div>
+          <div class="sub-panel active" data-panel="schedule">
+            <div class="card section-gap" data-roles="ADMIN,MANAGER" id="scheduleEditor">
               <h2 class="card-title" id="scheduleFormTitle">
                 Phân ca làm việc
               </h2>
@@ -268,11 +273,34 @@
                 >Nhân viên được phân công
                 <span class="muted">(chọn một hoặc nhiều người)</span></label
               >
-              <div class="employee-choices" id="scheduleStaffChoices"></div>
+              <div class="employee-choices" id="scheduleStaffChoices" onchange="ManhModule.renderSelectedStaff()"></div>
+              <p class="selected-summary" id="scheduleSelected" aria-live="polite"></p>
               <div class="form-grid section-gap">
                 <div class="form-group">
-                  <label>Ngày làm việc</label
-                  ><input id="scheduleDate" type="date" />
+                  <label>Từ ngày</label
+                  ><input id="scheduleDate" type="date" onchange="ManhModule.onRangeChange()" />
+                </div>
+                <div class="form-group">
+                  <label>Đến ngày</label
+                  ><input id="scheduleDateTo" type="date" onchange="ManhModule.onRangeChange()" />
+                </div>
+                <div class="form-group full" id="scheduleDaysGroup">
+                  <label>Các thứ trong tuần được xếp ca</label>
+                  <div class="pill-row" id="scheduleWeekdays" onchange="ManhModule.renderSelectedStaff()">
+                    <label class="pill"><input type="checkbox" value="1" checked /> T2</label>
+                    <label class="pill"><input type="checkbox" value="2" checked /> T3</label>
+                    <label class="pill"><input type="checkbox" value="3" checked /> T4</label>
+                    <label class="pill"><input type="checkbox" value="4" checked /> T5</label>
+                    <label class="pill"><input type="checkbox" value="5" checked /> T6</label>
+                    <label class="pill"><input type="checkbox" value="6" checked /> T7</label>
+                    <label class="pill"><input type="checkbox" value="7" checked /> CN</label>
+                  </div>
+                  <div class="toolbar">
+                    <button type="button" class="btn small-btn" onclick="ManhModule.setDays([1,2,3,4,5])">Thứ 2–6</button>
+                    <button type="button" class="btn small-btn" onclick="ManhModule.setDays([1,2,3,4,5,6,7])">Cả tuần</button>
+                    <button type="button" class="btn small-btn" onclick="ManhModule.setDays([6,7])">Cuối tuần</button>
+                    <button type="button" class="btn small-btn" onclick="ManhModule.setDays([])">Bỏ chọn</button>
+                  </div>
                 </div>
                 <div class="form-group">
                   <label>Vị trí trong ca</label
@@ -335,47 +363,7 @@
               </button>
               <p class="muted section-gap" id="scheduleRules"></p>
             </div>
-            <div class="card">
-              <h2 class="card-title">Chấm công theo lịch</h2>
-              <p class="role-notice">
-                Check-in trước ca tối đa 30 phút. Giờ công, đi trễ và về sớm
-                được tính theo thời điểm thực tế.
-              </p>
-              <div class="form-group">
-                <label>Nhân viên chấm công</label
-                ><select id="attendanceStaffSelect"></select>
-              </div>
-              <div class="toolbar section-gap">
-                <button
-                  class="btn btn-green"
-                  onclick="UI.run(this, () => ManhModule.attendance('checkin'))"
-                >
-                  Check-in</button
-                ><button
-                  class="btn btn-amber"
-                  onclick="
-                    UI.run(this, () => ManhModule.attendance('checkout'))
-                  "
-                >
-                  Check-out
-                </button>
-              </div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Nhân viên / vị trí</th>
-                      <th>Vào / ra</th>
-                      <th>Giờ công</th>
-                      <th>Đi trễ / về sớm</th>
-                    </tr>
-                  </thead>
-                  <tbody id="attendanceTableBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <div class="card section-gap">
+            <div class="card section-gap">
             <div class="card-title">
               <span id="calendarTitle">Lịch tuần</span>
               <div class="toolbar">
@@ -433,7 +421,65 @@
               </div>
             </details>
           </div>
-          <div class="card section-gap" data-roles="ADMIN,MANAGER">
+          </div>
+          <div class="sub-panel" data-panel="attendance">
+            <div class="card section-gap" id="myAttendanceCard">
+              <h2 class="card-title">Ca làm của tôi hôm nay</h2>
+              <p class="role-notice">
+                Đăng nhập chỉ để vào hệ thống. Giờ công chỉ được tính khi bạn
+                bấm <b>Check-in</b> lúc vào ca và <b>Check-out</b> lúc tan ca
+                (trước khi đăng xuất).
+              </p>
+              <div id="myAttendanceStatus" class="my-status"></div>
+              <div class="toolbar section-gap">
+                <button class="btn btn-green" onclick="UI.run(this, () => ManhModule.myAttendance('checkin'))">Check-in cho tôi</button>
+                <button class="btn btn-amber" onclick="UI.run(this, () => ManhModule.myAttendance('checkout'))">Check-out cho tôi</button>
+              </div>
+            </div>
+            <div class="section-gap">
+            <div class="card">
+              <h2 class="card-title" id="attendanceManageTitle">Bảng chấm công của chi nhánh</h2>
+              <p class="role-notice">
+                Check-in trước ca tối đa 30 phút. Giờ công, đi trễ và về sớm
+                được tính theo thời điểm thực tế.
+              </p>
+              <div class="form-group">
+                <label>Nhân viên chấm công</label
+                ><select id="attendanceStaffSelect"></select>
+              </div>
+              <div class="toolbar section-gap">
+                <button
+                  class="btn btn-green"
+                  onclick="UI.run(this, () => ManhModule.attendance('checkin'))"
+                >
+                  Check-in</button
+                ><button
+                  class="btn btn-amber"
+                  onclick="
+                    UI.run(this, () => ManhModule.attendance('checkout'))
+                  "
+                >
+                  Check-out
+                </button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nhân viên / vị trí</th>
+                      <th>Vào / ra</th>
+                      <th>Giờ công</th>
+                      <th>Đi trễ / về sớm</th>
+                    </tr>
+                  </thead>
+                  <tbody id="attendanceTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            </div>
+          </div>
+          <div class="sub-panel" data-panel="accounts">
+            <div class="card section-gap" data-roles="ADMIN,MANAGER">
             <h2 class="card-title" id="staffFormTitle">
               Nhân viên của chi nhánh
             </h2>
@@ -499,6 +545,7 @@
                 <tbody id="staffTableBody"></tbody>
               </table>
             </div>
+          </div>
           </div>
         </section>
         <section id="tab-shift" class="tab-pane">

@@ -10,6 +10,7 @@ const ManhModule = {
   hr: null,
   epoch: 0,
   weekStart: null,
+  sub: "schedule",
   weekHours(s) {
     const start = new Date(this.weekStart + "T00:00:00+07:00"),
       end = new Date(start.getTime() + 7 * 86400000);
@@ -49,6 +50,10 @@ const ManhModule = {
           : ["MANAGER", "STAFF"].includes(user.Role)
             ? "hr"
             : "branch",
+    );
+    // Nhân viên thường vào thẳng phần Chấm công; quản lý vào Lịch phân ca.
+    this.switchSub(
+      ["ADMIN", "MANAGER"].includes(user.Role) ? "schedule" : "attendance",
     );
   },
   applyRoles() {
@@ -166,6 +171,104 @@ const ManhModule = {
     });
     this.applyRoles();
     if (errors.length) throw new Error([...new Set(errors)].join(" "));
+  },
+  switchSub(name) {
+    this.sub = name;
+    document
+      .querySelectorAll("#tab-hr .sub-panel")
+      .forEach((e) => e.classList.toggle("active", e.dataset.panel === name));
+    document
+      .querySelectorAll("#hrSubtabs .subtab")
+      .forEach((e) => e.classList.toggle("active", e.dataset.sub === name));
+  },
+  /** Hiển thị ngay bên dưới danh sách chọn: đã chọn ai, làm vị trí nào, giờ nào. */
+  renderSelectedStaff() {
+    const names = [
+        ...UI.el("scheduleStaffChoices").querySelectorAll("input:checked"),
+      ].map(
+        (e) =>
+          this.hr?.nhanVien.find((n) => n.MaNhanVien === Number(e.value))
+            ?.HoTen,
+      ),
+      box = UI.el("scheduleSelected"),
+      dates = this.selectedDates(),
+      editing = !!UI.value("editScheduleId");
+    let text = names.length
+      ? `Đã chọn ${names.length} người: ${names.filter(Boolean).join(", ")}.`
+      : "Chưa chọn nhân viên nào.";
+    if (!editing)
+      text += dates.length
+        ? ` Sẽ tạo ${names.length * dates.length} ca (${names.length} người × ${dates.length} ngày: ${dates.map((d) => this.dayLabel(d)).join(", ")}).`
+        : " Chưa có ngày nào được chọn.";
+    box.textContent = text;
+  },
+  /** Thứ trong tuần của một ngày: 1 = Thứ 2 ... 7 = Chủ nhật. */
+  weekdayOf(date) {
+    return ((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  },
+  dayLabel(date) {
+    const w = this.weekdayOf(date);
+    return `${w === 7 ? "CN" : "T" + (w + 1)} ${date.slice(8)}/${date.slice(5, 7)}`;
+  },
+  /** Danh sách ngày sẽ được phân ca = từ ngày..đến ngày lọc theo các thứ đã tick. */
+  selectedDates() {
+    const from = UI.value("scheduleDate"),
+      to = UI.value("scheduleDateTo") || from;
+    if (!from) return [];
+    if (UI.value("editScheduleId")) return [from];
+    const days = [
+        ...UI.el("scheduleWeekdays").querySelectorAll("input:checked"),
+      ].map((e) => Number(e.value)),
+      out = [];
+    for (let d = from, i = 0; d <= to && i < 31; d = UI.addDays(d, 1), i++)
+      if (days.includes(this.weekdayOf(d))) out.push(d);
+    return out;
+  },
+  setDays(list) {
+    UI.el("scheduleWeekdays")
+      .querySelectorAll("input")
+      .forEach((e) => (e.checked = list.includes(Number(e.value))));
+    this.renderSelectedStaff();
+  },
+  onRangeChange() {
+    const from = UI.value("scheduleDate");
+    if (!UI.value("scheduleDateTo") || UI.value("scheduleDateTo") < from)
+      UI.el("scheduleDateTo").value = from;
+    this.renderSelectedStaff();
+  },
+  myOpenAttendance() {
+    return (
+      this.hr?.chamCong.find(
+        (a) =>
+          a.MaNhanVien === this.user?.MaNhanVien && a.ThoiGianCheckOut == null,
+      ) || null
+    );
+  },
+  /** Trạng thái chấm công của chính người đang đăng nhập. */
+  renderMyAttendance() {
+    if (!this.hr || !this.user) return;
+    const today = UI.today(),
+      mine = this.hr.phanCa.filter(
+        (s) =>
+          s.MaNhanVien === this.user.MaNhanVien &&
+          s.TrangThai === "scheduled" &&
+          UI.isoDay(s.BatDauLam) === today,
+      ),
+      open = this.myOpenAttendance(),
+      box = UI.el("myAttendanceStatus");
+    if (open) {
+      box.className = "my-status my-on";
+      box.textContent = `Đang làm việc từ ${UI.clock(open.ThoiGianCheckIn)} (${open.ViTriLamViec}). Nhớ Check-out khi tan ca.`;
+    } else if (mine.length) {
+      box.className = "my-status my-wait";
+      box.textContent = `Hôm nay bạn có ca: ${mine.map((s) => `${UI.clock(s.BatDauLam)}–${UI.clock(s.KetThucLam)} · ${s.ViTriLamViec}`).join("; ")}. Chưa check-in (được check-in trước ca tối đa 30 phút).`;
+    } else {
+      box.className = "my-status";
+      box.textContent = "Hôm nay bạn không có ca nào được xếp.";
+    }
+  },
+  myAttendance(action) {
+    return this.hrAction({ action, MaNhanVien: this.user.MaNhanVien });
   },
   switchTab(tab) {
     const button = document.querySelector(`[data-tab="${tab}"]`);
@@ -295,6 +398,8 @@ const ManhModule = {
         )
         .join("") || UI.empty(4);
     this.renderCalendar();
+    this.renderSelectedStaff();
+    this.renderMyAttendance();
   },
   scheduleActions(s) {
     const own = s.MaNhanVien === this.user.MaNhanVien,
@@ -405,6 +510,15 @@ const ManhModule = {
       UI.today() <= UI.addDays(this.weekStart, 6)
         ? UI.today()
         : this.weekStart || UI.today();
+    // Mặc định xếp từ ngày đang chọn đến hết tuần đang xem; có dòng xem trước số ca trước khi lưu.
+    UI.el("scheduleDateTo").value = this.weekStart
+      ? UI.addDays(this.weekStart, 6)
+      : UI.el("scheduleDate").value;
+    if (UI.el("scheduleDateTo").value < UI.el("scheduleDate").value)
+      UI.el("scheduleDateTo").value = UI.el("scheduleDate").value;
+    UI.el("scheduleDateTo").disabled = false;
+    UI.el("scheduleDaysGroup").hidden = false;
+    this.setDays([1, 2, 3, 4, 5, 6, 7]);
     UI.el("scheduleStart").value = "06:00";
     UI.el("scheduleEnd").value = "12:00";
     UI.el("scheduleOvernight").checked = false;
@@ -413,14 +527,18 @@ const ManhModule = {
     UI.el("scheduleStaffChoices")
       .querySelectorAll("input")
       .forEach((e) => (e.checked = false));
+    this.renderSelectedStaff();
   },
   prefillSchedule(employee, date) {
     this.resetSchedule();
     UI.el("scheduleDate").value = date;
+    UI.el("scheduleDateTo").value = date; // bấm vào một ô lịch = xếp đúng ngày đó
+    this.setDays([1, 2, 3, 4, 5, 6, 7]);
     const box = UI.el("scheduleStaffChoices").querySelector(
       `input[value="${employee}"]`,
     );
     if (box) box.checked = true;
+    this.renderSelectedStaff();
     UI.el("scheduleEditor").scrollIntoView({
       behavior: "smooth",
       block: "start",
@@ -444,6 +562,11 @@ const ManhModule = {
     this.prefillSchedule(s.MaNhanVien, UI.isoDay(s.BatDauLam));
     UI.el("editScheduleId").value = id;
     UI.el("scheduleFormTitle").textContent = `Sửa ca #${id}`;
+    // Sửa một ca cụ thể: chỉ có một ngày, ẩn phần chọn khoảng ngày.
+    UI.el("scheduleDateTo").value = UI.el("scheduleDate").value;
+    UI.el("scheduleDateTo").disabled = true;
+    UI.el("scheduleDaysGroup").hidden = true;
+    this.renderSelectedStaff();
     UI.el("scheduleStart").value = UI.clock(s.BatDauLam);
     UI.el("scheduleEnd").value = UI.clock(s.KetThucLam);
     UI.el("scheduleOvernight").checked =
@@ -462,14 +585,25 @@ const ManhModule = {
     return r;
   },
   async saveSchedule() {
-    const date = UI.value("scheduleDate");
+    const date = UI.value("scheduleDate"),
+      editing = !!UI.value("editScheduleId");
+    if (!editing && !this.selectedDates().length)
+      throw new Error("Chưa có ngày nào được chọn. Kiểm tra Từ ngày, Đến ngày và các thứ trong tuần.");
     await this.hrAction({
-      action: UI.value("editScheduleId") ? "update_shift" : "assign_shift",
+      action: editing ? "update_shift" : "assign_shift",
       MaPhanCa: UI.value("editScheduleId"),
       NhanVienIds: [
         ...UI.el("scheduleStaffChoices").querySelectorAll("input:checked"),
       ].map((e) => Number(e.value)),
-      NgayLamViec: date,
+      ...(editing
+        ? { NgayLamViec: date }
+        : {
+            TuNgay: date,
+            DenNgay: UI.value("scheduleDateTo") || date,
+            CacThu: [
+              ...UI.el("scheduleWeekdays").querySelectorAll("input:checked"),
+            ].map((e) => Number(e.value)),
+          }),
       GioBatDau: UI.value("scheduleStart"),
       GioKetThuc: UI.value("scheduleEnd"),
       QuaDem: UI.el("scheduleOvernight").checked,
@@ -546,6 +680,11 @@ const ManhModule = {
     this.resetStaff();
   },
   async logout() {
+    if (
+      this.myOpenAttendance() &&
+      !confirm("Bạn chưa Check-out ca làm. Vẫn đăng xuất?")
+    )
+      return;
     await ApiClient.post("/auth/logout", {});
     this.showLogin();
     UI.notify("Đã đăng xuất.");
@@ -559,6 +698,7 @@ const ManhModule = {
     this.showLogin();
     UI.notify(r.message);
   },
+  // Mạnh: tải và hiển thị báo cáo chi nhánh.
   async loadReport() {
     const branch = this.currentBranchId,
       d = await ApiClient.get(
