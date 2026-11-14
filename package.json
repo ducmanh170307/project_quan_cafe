@@ -1,0 +1,19 @@
+{
+  "name": "kiotcafe-project",
+  "version": "2.0.0",
+  "private": true,
+  "workspaces": [
+    "backend"
+  ],
+  "scripts": {
+    "start": "npm start --workspace backend",
+    "dev": "npm run dev --workspace backend",
+    "test": "npm test --workspace backend",
+    "check": "npm run check --workspace backend",
+    "db:check": "npm run db:check --workspace backend",
+    "test:sql": "npm run test:sql --workspace backend"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
