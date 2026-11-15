@@ -134,11 +134,18 @@ const YModule = {
     await ManhModule.refresh();
   },
   async createCashflow() {
+    const shiftId = this.requireShift(),
+      type = UI.value("cashflowType"),
+      amount = Number(UI.value("cashflowAmount")),
+      reason = UI.value("cashflowReason");
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1e12)
+      throw new Error("Số tiền thu chi phải là số nguyên từ 1 đến 1.000.000.000.000đ.");
+    if (!reason) throw new Error("Vui lòng nhập lý do thu chi.");
     const r = await ApiClient.post("/shifts/cashflow", {
-      MaPhienCa: this.requireShift(),
-      LoaiPhieu: UI.value("cashflowType"),
-      SoTien: UI.value("cashflowAmount"),
-      LyDo: UI.value("cashflowReason"),
+      MaPhienCa: shiftId,
+      LoaiPhieu: type,
+      SoTien: amount,
+      LyDo: reason,
     });
     UI.el("cashflowAmount").value = "";
     UI.el("cashflowReason").value = "";
