@@ -153,18 +153,24 @@ const YModule = {
     await ManhModule.refresh();
   },
   async closeShift() {
+    const branchId = ManhModule.currentBranchId,
+      user = ManhModule.user;
     const r = await ApiClient.post("/shifts/close", {
       MaPhienCa: this.requireShift(),
       TienMatThucTeCuoiCa: UI.value("actualCash"),
       LyDoChenhLechCuoiCa: UI.value("closeShiftReason"),
     });
-    await ManhModule.refresh();
+    if (ManhModule.currentBranchId !== branchId || ManhModule.user !== user)
+      return;
+    UI.el("actualCash").value = "";
+    UI.el("closeShiftReason").value = "";
+    UI.el("openShiftReason").value = "";
+    delete UI.el("openShiftMoney").dataset.touched;
+    UI.el("differencePreview").textContent = "";
     UI.el("shiftReconcileResult").textContent =
       `Lý thuyết ${UI.money(r.theoreticalCash)}đ · Thực đếm ${UI.money(r.actualCash)}đ · Chênh lệch ${UI.money(r.difference)}đ`;
     UI.notify(r.message);
-    UI.el("actualCash").value = "";
-    delete UI.el("openShiftMoney").dataset.touched;
-    UI.el("differencePreview").textContent = "";
+    await ManhModule.refresh();
   },
   async createPromo() {
     const start = UI.value("promoStart"),
