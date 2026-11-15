@@ -17,7 +17,10 @@ const YModule = {
     UI.el("shiftSummary").textContent = "";
     UI.el("shiftReconcileResult").textContent = "";
     UI.el("differencePreview").textContent = "";
-    delete UI.el("openShiftMoney").dataset.touched;
+    const openingMoney = UI.el("openShiftMoney");
+    openingMoney.value = openingMoney.defaultValue;
+    delete openingMoney.dataset.touched;
+    UI.el("openShiftReason").value = "";
     UI.el("shiftBanner").textContent = "Đang tải trạng thái ca...";
     UI.el("shiftBanner").className = "status-banner";
     UI.el("posShiftWarning").hidden = true;
