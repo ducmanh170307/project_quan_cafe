@@ -17,7 +17,10 @@ const YModule = {
     UI.el("shiftSummary").textContent = "";
     UI.el("shiftReconcileResult").textContent = "";
     UI.el("differencePreview").textContent = "";
-    delete UI.el("openShiftMoney").dataset.touched;
+    const openingMoney = UI.el("openShiftMoney");
+    openingMoney.value = openingMoney.defaultValue;
+    delete openingMoney.dataset.touched;
+    UI.el("openShiftReason").value = "";
     UI.el("shiftBanner").textContent = "Đang tải trạng thái ca...";
     UI.el("shiftBanner").className = "status-banner";
     UI.el("posShiftWarning").hidden = true;
@@ -131,11 +134,18 @@ const YModule = {
     await ManhModule.refresh();
   },
   async createCashflow() {
+    const shiftId = this.requireShift(),
+      type = UI.value("cashflowType"),
+      amount = Number(UI.value("cashflowAmount")),
+      reason = UI.value("cashflowReason");
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1e12)
+      throw new Error("Số tiền thu chi phải là số nguyên từ 1 đến 1.000.000.000.000đ.");
+    if (!reason) throw new Error("Vui lòng nhập lý do thu chi.");
     const r = await ApiClient.post("/shifts/cashflow", {
-      MaPhienCa: this.requireShift(),
-      LoaiPhieu: UI.value("cashflowType"),
-      SoTien: UI.value("cashflowAmount"),
-      LyDo: UI.value("cashflowReason"),
+      MaPhienCa: shiftId,
+      LoaiPhieu: type,
+      SoTien: amount,
+      LyDo: reason,
     });
     UI.el("cashflowAmount").value = "";
     UI.el("cashflowReason").value = "";
@@ -143,18 +153,24 @@ const YModule = {
     await ManhModule.refresh();
   },
   async closeShift() {
+    const branchId = ManhModule.currentBranchId,
+      user = ManhModule.user;
     const r = await ApiClient.post("/shifts/close", {
       MaPhienCa: this.requireShift(),
       TienMatThucTeCuoiCa: UI.value("actualCash"),
       LyDoChenhLechCuoiCa: UI.value("closeShiftReason"),
     });
-    await ManhModule.refresh();
+    if (ManhModule.currentBranchId !== branchId || ManhModule.user !== user)
+      return;
+    UI.el("actualCash").value = "";
+    UI.el("closeShiftReason").value = "";
+    UI.el("openShiftReason").value = "";
+    delete UI.el("openShiftMoney").dataset.touched;
+    UI.el("differencePreview").textContent = "";
     UI.el("shiftReconcileResult").textContent =
       `Lý thuyết ${UI.money(r.theoreticalCash)}đ · Thực đếm ${UI.money(r.actualCash)}đ · Chênh lệch ${UI.money(r.difference)}đ`;
     UI.notify(r.message);
-    UI.el("actualCash").value = "";
-    delete UI.el("openShiftMoney").dataset.touched;
-    UI.el("differencePreview").textContent = "";
+    await ManhModule.refresh();
   },
   async createPromo() {
     const start = UI.value("promoStart"),
