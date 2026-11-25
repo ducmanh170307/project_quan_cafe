@@ -26,14 +26,20 @@ async function verify(data) {
   const branch = v.id(data.MaChiNhanh, "Chi nhánh"),
     promo = await find(data.MaCode),
     subtotal = v.money(data.TongTienHang, "Tiền hàng"),
-    discount = calculateDiscount(subtotal, promo, new Date(), branch);
+    discount = calculateDiscount(
+      subtotal,
+      promo,
+      new Date(),
+      branch,
+      !!v.phone(data.SoDienThoaiKhach, true),
+    );
   return { promo, discount, total: subtotal - discount };
 }
 async function available(branchId) {
   const branch = v.id(branchId);
   return (
     await db.query(
-      "SELECT MaCode,TenChuongTrinh,LoaiKhuyenMai,GiaTriGiam,DonToiThieu,GiamToiDa,NgayKetThuc FROM ChuongTrinhKhuyenMai WHERE TrangThai='active' AND NgayBatDau<=SYSUTCDATETIME() AND NgayKetThuc>=SYSUTCDATETIME() AND (MaChiNhanh IS NULL OR MaChiNhanh=@branch) AND (GioiHanLuotDung IS NULL OR SoLuotDaDung<GioiHanLuotDung) ORDER BY NgayKetThuc,MaKhuyenMai",
+      "SELECT MaCode,TenChuongTrinh,LoaiKhuyenMai,GiaTriGiam,DonToiThieu,GiamToiDa,NgayBatDau,NgayKetThuc,DoiTuongApDung FROM ChuongTrinhKhuyenMai WHERE TrangThai='active' AND NgayBatDau<=SYSUTCDATETIME() AND NgayKetThuc>=SYSUTCDATETIME() AND (MaChiNhanh IS NULL OR MaChiNhanh=@branch) AND (GioiHanLuotDung IS NULL OR SoLuotDaDung<GioiHanLuotDung) ORDER BY NgayKetThuc,MaKhuyenMai",
       { branch },
     )
   ).recordset;
@@ -55,7 +61,12 @@ async function insertPromotion(data, actor) {
     400,
     "Mã chỉ gồm chữ không dấu, số, _ và -.",
   );
-  const name = v.text(data.TenChuongTrinh, "Tên voucher", 150),
+  const audience = v.choice(
+      data.DoiTuongApDung || "ALL",
+      ["ALL", "MEMBER"],
+      "Đối tượng áp dụng",
+    ),
+    name = v.text(data.TenChuongTrinh, "Tên voucher", 150),
     type = v.choice(data.LoaiKhuyenMai, ["PERCENT", "FIXED"], "Loại giảm giá"),
     value = v.money(data.GiaTriGiam, "Giá trị giảm", 1),
     min = v.money(data.DonToiThieu ?? 0, "Đơn tối thiểu"),
@@ -86,8 +97,8 @@ async function insertPromotion(data, actor) {
         : null
       : actor.MaChiNhanh;
   await db.query(
-    "INSERT INTO ChuongTrinhKhuyenMai(MaCode,TenChuongTrinh,LoaiKhuyenMai,GiaTriGiam,DonToiThieu,GiamToiDa,NgayBatDau,NgayKetThuc,MaChiNhanh,GioiHanLuotDung) VALUES(@code,@name,@type,@value,@min,@max,@start,@end,@branch,@limit)",
-    { code, name, type, value, min, max, start, end, branch, limit },
+    "INSERT INTO ChuongTrinhKhuyenMai(MaCode,TenChuongTrinh,LoaiKhuyenMai,GiaTriGiam,DonToiThieu,GiamToiDa,NgayBatDau,NgayKetThuc,MaChiNhanh,GioiHanLuotDung,DoiTuongApDung) VALUES(@code,@name,@type,@value,@min,@max,@start,@end,@branch,@limit,@audience)",
+    { code, name, type, value, min, max, start, end, branch, limit, audience },
   );
   return { message: "Đã tạo voucher. Khách có thể áp dụng khi thanh toán." };
 }
@@ -110,9 +121,42 @@ async function setStatus(id, data, actor) {
   assert(r.recordset[0], 404, "Không tìm thấy voucher thuộc phạm vi quản lý.");
   return { message: "Đã cập nhật voucher." };
 }
-async function claim(promo, branch, tx) {
+/** Xóa voucher chưa từng gắn vào đơn nào; voucher đã dùng chỉ được tắt để giữ lịch sử đơn hàng. */
+async function remove(id, actor) {
+  access.role(actor, access.managers);
+  const scope = {
+    id: v.id(id),
+    all: actor.Role === "ADMIN",
+    branch: actor.MaChiNhanh,
+  };
+  const found = await db.query(
+    "SELECT MaKhuyenMai,MaCode FROM ChuongTrinhKhuyenMai WHERE MaKhuyenMai=@id AND (@all=1 OR MaChiNhanh=@branch)",
+    scope,
+  );
+  assert(found.recordset[0], 404, "Không tìm thấy voucher thuộc phạm vi quản lý.");
+  const used = await db.query(
+    "SELECT COUNT(*) AS Total FROM DonHang WHERE MaKhuyenMai=@id",
+    { id: scope.id },
+  );
+  assert(
+    Number(used.recordset[0].Total) === 0,
+    409,
+    "Voucher đã được dùng trong đơn hàng nên không thể xóa. Hãy bấm Tắt voucher.",
+  );
+  await db.query("DELETE FROM ChuongTrinhKhuyenMai WHERE MaKhuyenMai=@id", {
+    id: scope.id,
+  });
+  return { message: `Đã xóa voucher ${found.recordset[0].MaCode}.` };
+}
+async function claim(promo, branch, tx, hasCustomer = undefined) {
   if (!promo) return;
-  calculateDiscount(Number.MAX_SAFE_INTEGER, promo, new Date(), branch);
+  calculateDiscount(
+    Number.MAX_SAFE_INTEGER,
+    promo,
+    new Date(),
+    branch,
+    hasCustomer,
+  );
   const r = await db.query(
     "/* voucher:claim */ UPDATE ChuongTrinhKhuyenMai SET SoLuotDaDung=SoLuotDaDung+1 OUTPUT INSERTED.MaKhuyenMai WHERE MaKhuyenMai=@id AND TrangThai='active' AND NgayBatDau<=SYSUTCDATETIME() AND NgayKetThuc>=SYSUTCDATETIME() AND (MaChiNhanh IS NULL OR MaChiNhanh=@branch) AND (GioiHanLuotDung IS NULL OR SoLuotDaDung<GioiHanLuotDung)",
     { id: promo.MaKhuyenMai, branch },
@@ -142,6 +186,7 @@ module.exports = {
   list,
   insertPromotion,
   setStatus,
+  remove,
   claim,
   customers,
 };

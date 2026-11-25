@@ -1,6 +1,12 @@
 const { assert } = require("./errors");
 const v = require("./validation");
-function calculateDiscount(subtotal, promo, now = new Date(), branchId = null) {
+function calculateDiscount(
+  subtotal,
+  promo,
+  now = new Date(),
+  branchId = null,
+  hasCustomer = undefined,
+) {
   if (!promo) return 0;
   assert(
     promo.TrangThai === "active" &&
@@ -18,6 +24,11 @@ function calculateDiscount(subtotal, promo, now = new Date(), branchId = null) {
     promo.MaChiNhanh == null || Number(promo.MaChiNhanh) === Number(branchId),
     400,
     "Voucher không áp dụng cho chi nhánh này.",
+  );
+  assert(
+    promo.DoiTuongApDung !== "MEMBER" || hasCustomer === true,
+    400,
+    "Voucher chỉ áp dụng cho khách thành viên. Hãy nhập số điện thoại khách.",
   );
   assert(
     promo.GioiHanLuotDung == null ||
@@ -97,6 +108,7 @@ function calculateTotals(
   promo = null,
   toppings = [],
   branchId = null,
+  hasCustomer = undefined,
 ) {
   let subtotal = 0;
   const lines = items.map((item) => {
@@ -158,7 +170,13 @@ function calculateTotals(
     };
   });
   assert(subtotal <= 1e12, 400, "Giá trị đơn hàng quá lớn.");
-  const discount = calculateDiscount(subtotal, promo, new Date(), branchId);
+  const discount = calculateDiscount(
+    subtotal,
+    promo,
+    new Date(),
+    branchId,
+    hasCustomer,
+  );
   return { lines, subtotal, discount, total: subtotal - discount };
 }
 module.exports = {

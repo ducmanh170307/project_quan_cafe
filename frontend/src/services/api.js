@@ -145,6 +145,21 @@ const UI = {
       }
     }
   },
+  /** Phân trang phía giao diện: cắt danh sách theo trang và đưa trang về mức hợp lệ. */
+  paginate(rows, page, size) {
+    const pages = Math.max(1, Math.ceil(rows.length / size)),
+      current = Math.min(Math.max(1, page), pages);
+    return {
+      items: rows.slice((current - 1) * size, current * size),
+      page: current,
+      pages,
+      total: rows.length,
+    };
+  },
+  pagerHtml(p, handler) {
+    if (p.total <= 0) return "";
+    return `<button class="btn small-btn" ${p.page <= 1 ? "disabled" : ""} onclick="${handler}(-1)">‹ Trước</button><span>Trang ${p.page} / ${p.pages} · ${p.total} mục</span><button class="btn small-btn" ${p.page >= p.pages ? "disabled" : ""} onclick="${handler}(1)">Sau ›</button>`;
+  },
   options(rows, id, name) {
     return rows
       .map(

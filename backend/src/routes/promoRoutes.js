@@ -6,4 +6,5 @@ router.post("/", controller.createPromotion);
 router.post("/verify", controller.verifyPromotion);
 router.get("/customers", controller.getCustomers);
 router.put("/:id/status", controller.setStatus);
+router.delete("/:id", controller.removePromotion);
 module.exports = router;

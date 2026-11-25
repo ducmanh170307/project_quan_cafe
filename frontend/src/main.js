@@ -3,6 +3,7 @@ import { ManhModule } from "./modules/manhBranchHr.js";
 import { YModule } from "./modules/yShiftCashflow.js";
 import { TrucModule } from "./modules/trucPosKds.js";
 import { LinhModule } from "./modules/linhMenu.js";
+import { OptionPicker } from "./services/optionPicker.js";
 Object.assign(window, {
   ApiClient,
   UI,
@@ -10,6 +11,7 @@ Object.assign(window, {
   YModule,
   TrucModule,
   LinhModule,
+  OptionPicker,
 });
 window.addEventListener("session-expired", () => ManhModule.showLogin());
 UI.el("scheduleDate").value = UI.today();

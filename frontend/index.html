@@ -676,6 +676,7 @@
                   <option value="MON_AN">Món ăn</option>
                 </select>
               </div>
+              <div id="posCategories" class="pill-row category-bar" aria-label="Danh mục"></div>
               <div id="posProductGrid" class="menu-grid"></div>
             </div>
             <div class="card">
@@ -695,8 +696,12 @@
               </div>
               <div class="form-grid section-gap">
                 <div class="form-group">
-                  <label>Số điện thoại khách (tích điểm)</label
-                  ><input id="posPhone" />
+                  <label>Số điện thoại khách (tích điểm / voucher thành viên)</label
+                  ><input
+                    id="posPhone"
+                    inputmode="tel"
+                    onchange="TrucModule.touchCart()"
+                  />
                 </div>
                 <div class="form-group">
                   <label>Tên khách</label><input id="posName" />
@@ -729,6 +734,7 @@
                   </select>
                 </div>
               </div>
+              <p id="posVoucherInfo" class="voucher-info" hidden></p>
               <p id="posVoucherMessage" class="muted" aria-live="polite"></p>
               <div class="bill-box">
                 <p>Tiền hàng <span id="posTotalAmount">0</span> đ</p>
@@ -788,6 +794,7 @@
                 <tbody id="orderTableBody"></tbody>
               </table>
             </div>
+            <div class="pager" id="orderPager"></div>
             <p class="section-gap">
               <a href="order.html" class="btn" target="_blank" rel="noopener"
                 >Mở trang đặt món cho khách</a
@@ -976,7 +983,7 @@
         </section>
 
         <section id="tab-promo" class="tab-pane">
-          <div class="grid-2">
+          <div class="promo-layout">
             <div class="card" data-roles="ADMIN,MANAGER">
               <h2 class="card-title">Tạo voucher</h2>
               <div class="form-grid">
@@ -1024,6 +1031,15 @@
                   <label>Giới hạn lượt (bỏ trống: không giới hạn)</label
                   ><input id="promoLimit" type="number" min="1" />
                 </div>
+                <div class="form-group full">
+                  <label>Đối tượng áp dụng</label
+                  ><select id="promoAudience">
+                    <option value="ALL">Mọi khách hàng</option>
+                    <option value="MEMBER">
+                      Chỉ khách thành viên (phải nhập SĐT khi thanh toán)
+                    </option>
+                  </select>
+                </div>
               </div>
               <button
                 class="btn btn-green"
@@ -1038,21 +1054,60 @@
             </div>
             <div class="card">
               <h2 class="card-title">Voucher đang quản lý</h2>
+              <div id="promoSummary" class="pill-row"></div>
+              <div class="filter-bar">
+                <input
+                  id="promoSearch"
+                  placeholder="Tìm mã hoặc tên..."
+                  oninput="YModule.filterPromos()"
+                />
+                <select
+                  id="promoFilterStatus"
+                  aria-label="Lọc bật/tắt"
+                  onchange="YModule.filterPromos()"
+                >
+                  <option value="">Bật + tắt</option>
+                  <option value="active">Chỉ đang bật</option>
+                  <option value="inactive">Chỉ đã tắt</option>
+                </select>
+                <select
+                  id="promoFilterTime"
+                  aria-label="Lọc thời gian"
+                  onchange="YModule.filterPromos()"
+                >
+                  <option value="">Mọi thời gian</option>
+                  <option value="running">Đang hiệu lực</option>
+                  <option value="upcoming">Sắp diễn ra</option>
+                  <option value="expired">Đã hết hạn</option>
+                  <option value="exhausted">Hết lượt dùng</option>
+                </select>
+                <select
+                  id="promoFilterAudience"
+                  aria-label="Lọc đối tượng"
+                  onchange="YModule.filterPromos()"
+                >
+                  <option value="">Mọi đối tượng</option>
+                  <option value="ALL">Mọi khách</option>
+                  <option value="MEMBER">Khách thành viên</option>
+                </select>
+              </div>
               <div class="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Mã / ưu đãi</th>
                       <th>Giảm / đơn tối thiểu</th>
-                      <th>Phạm vi / hạn</th>
+                      <th>Đối tượng / phạm vi</th>
+                      <th>Thời gian hiệu lực</th>
                       <th>Lượt</th>
-                      <th>Trạng thái</th>
+                      <th>Tình trạng</th>
                       <th>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody id="promoTableBody"></tbody>
                 </table>
               </div>
+              <div class="pager" id="promoPager"></div>
             </div>
           </div>
           <div class="card section-gap">
@@ -1071,10 +1126,14 @@
                 <tbody id="customerTableBody"></tbody>
               </table>
             </div>
+            <div class="pager" id="customerPager"></div>
           </div>
         </section>
       </main>
     </div>
+    <dialog id="optionDialog" class="option-dialog">
+      <div id="optionBody"></div>
+    </dialog>
     <dialog id="receiptDialog">
       <div id="receiptContent"></div>
       <div class="dialog-controls">

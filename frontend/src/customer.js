@@ -1,5 +1,6 @@
 import { ApiClient, UI } from "./services/api.js";
 import { BillQuote } from "./services/billing.js";
+import { OptionPicker, lineKey, optionText } from "./services/optionPicker.js";
 const Customer = {
   branches: [],
   products: [],
@@ -15,6 +16,9 @@ const Customer = {
       MaSanPham: l.MaSanPham,
       TenSize: l.TenSize,
       SoLuong: l.SoLuong,
+      MucDuong: l.MucDuong,
+      MucDa: l.MucDa,
+      GhiChu: l.GhiChu,
       Toppings: l.Toppings.map((t) => ({
         MaTopping: t.MaTopping,
         SoLuong: t.SoLuong,
@@ -27,6 +31,9 @@ const Customer = {
         endpoint: "/public/quote",
         getPayload: () => ({
           MaChiNhanh: UI.value("branch"),
+          SoDienThoaiKhach: /^0\d{9,10}$/.test(UI.value("customerPhone"))
+            ? UI.value("customerPhone")
+            : "",
           Items: this.items(),
         }),
         onChange: () => this.renderBill(),
@@ -72,7 +79,7 @@ const Customer = {
       results[1].vouchers
         .map(
           (v) =>
-            `<option value="${UI.escape(v.MaCode)}">${UI.escape(v.MaCode)} · ${UI.escape(v.TenChuongTrinh)}</option>`,
+            `<option value="${UI.escape(v.MaCode)}">${UI.escape(v.MaCode)} · ${UI.escape(v.TenChuongTrinh)}${v.DoiTuongApDung === "MEMBER" ? " [Thành viên]" : ""}</option>`,
         )
         .join("");
     this.renderMenu();
@@ -90,43 +97,31 @@ const Customer = {
         )
         .map(
           ({ p, i }) =>
-            `<article class="card product-card"><img class="product-photo" src="${UI.escape(p.HinhAnh || "/src/assets/menu/placeholder.svg")}" alt="${UI.escape(p.TenSanPham)}" loading="lazy" onerror="this.onerror=null;this.src='/src/assets/menu/placeholder.svg'"><h3>${UI.escape(p.TenSanPham)} · ${p.TenSize === "PHAN" ? "Phần" : UI.escape(p.TenSize)}</h3><p>${UI.money(p.GiaBan)}đ</p>${p.LoaiSanPham === "MON_AN" ? "" : `<label class="muted">Topping</label><select multiple id="customerToppings_${i}" aria-label="Topping">${this.toppings.map((t) => `<option value="${t.MaTopping}">${UI.escape(t.TenTopping)} +${UI.money(t.GiaBan)}đ</option>`).join("")}</select>`}<button class="btn btn-green" onclick="Customer.add(${i})">+ Chọn</button></article>`,
+            `<article class="card product-card"><img class="product-photo" src="${UI.escape(p.HinhAnh || "/src/assets/menu/placeholder.svg")}" alt="${UI.escape(p.TenSanPham)}" loading="lazy" onerror="this.onerror=null;this.src='/src/assets/menu/placeholder.svg'"><h3>${UI.escape(p.TenSanPham)} · ${p.TenSize === "PHAN" ? "Phần" : UI.escape(p.TenSize)}</h3><p>${UI.money(p.GiaBan)}đ</p><button class="btn btn-green" onclick="Customer.add(${i})">${p.LoaiSanPham === "MON_AN" ? "+ Chọn" : "Chọn đường, đá, topping"}</button></article>`,
         )
         .join("") || "<p>Chưa có món phù hợp.</p>";
   },
   add(i) {
     if (this.sending) return;
-    const p = this.products[i],
-      select = UI.el(`customerToppings_${i}`),
-      chosen = select
-        ? [...select.selectedOptions]
-            .map((o) =>
-              this.toppings.find((t) => t.MaTopping === Number(o.value)),
-            )
-            .sort((a, b) => a.MaTopping - b.MaTopping)
-        : [],
-      Toppings = chosen.map((t) => ({
-        MaTopping: t.MaTopping,
+    const p = this.products[i];
+    if (!p) return;
+    const push = (choice) => {
+      const line = { ...p, ...choice },
+        found = this.cart.find((l) => lineKey(l) === lineKey(line));
+      if (found) found.SoLuong += line.SoLuong;
+      else this.cart.push(line);
+      this.touch();
+    };
+    if (p.LoaiSanPham === "MON_AN")
+      return push({
         SoLuong: 1,
-        TenTopping: t.TenTopping,
-      })),
-      key = JSON.stringify(Toppings.map((t) => t.MaTopping)),
-      found = this.cart.find(
-        (l) =>
-          l.MaSanPham === p.MaSanPham &&
-          l.TenSize === p.TenSize &&
-          JSON.stringify(l.Toppings.map((t) => t.MaTopping)) === key,
-      );
-    if (found) found.SoLuong++;
-    else
-      this.cart.push({
-        ...p,
-        GiaBan:
-          Number(p.GiaBan) + chosen.reduce((s, t) => s + Number(t.GiaBan), 0),
-        SoLuong: 1,
-        Toppings,
+        MucDuong: "100%",
+        MucDa: "100%",
+        GhiChu: "",
+        Toppings: [],
+        GiaBan: Number(p.GiaBan),
       });
-    this.touch();
+    OptionPicker.open(p, this.toppings, push);
   },
   changeQty(i, delta) {
     if (this.sending) return;
@@ -150,7 +145,7 @@ const Customer = {
       this.cart
         .map(
           (l, i) =>
-            `<tr><td>${UI.escape(l.TenSanPham)} ${l.TenSize === "PHAN" ? "Phần" : UI.escape(l.TenSize)}<br><small>${l.Toppings.map((t) => UI.escape(t.TenTopping)).join(", ")}</small></td><td><div class="cart-qty"><button class="btn small-btn" onclick="Customer.changeQty(${i},-1)">−</button>${l.SoLuong}<button class="btn small-btn" onclick="Customer.changeQty(${i},1)">+</button></div></td><td>${UI.money(l.SoLuong * l.GiaBan)}</td><td><button class="btn small-btn" onclick="Customer.remove(${i})">Xóa</button></td></tr>`,
+            `<tr><td>${UI.escape(l.TenSanPham)} ${l.TenSize === "PHAN" ? "Phần" : UI.escape(l.TenSize)}<br><small>${UI.escape(optionText(l))}${l.GhiChu ? "<br>Ghi chú: " + UI.escape(l.GhiChu) : ""}</small></td><td><div class="cart-qty"><button class="btn small-btn" onclick="Customer.changeQty(${i},-1)">−</button>${l.SoLuong}<button class="btn small-btn" onclick="Customer.changeQty(${i},1)">+</button></div></td><td>${UI.money(l.SoLuong * l.GiaBan)}</td><td><button class="btn small-btn" onclick="Customer.remove(${i})">Xóa</button></td></tr>`,
         )
         .join("") || UI.empty(4, "Chọn món để bắt đầu");
     this.renderBill();
@@ -233,5 +228,5 @@ const Customer = {
     }
   },
 };
-Object.assign(window, { UI, Customer });
+Object.assign(window, { UI, Customer, OptionPicker });
 Customer.init().catch((error) => UI.notify(error.message, true));

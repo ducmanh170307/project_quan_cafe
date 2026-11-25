@@ -126,7 +126,7 @@ EXEC(N'CREATE TABLE dbo.KhachHang (
 IF OBJECT_ID(N'dbo.ChuongTrinhKhuyenMai',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.ChuongTrinhKhuyenMai (
     MaKhuyenMai INT IDENTITY PRIMARY KEY,
-    MaCode VARCHAR(40) NOT NULL UNIQUE, MaChiNhanh INT NULL REFERENCES ChiNhanh(MaChiNhanh), GioiHanLuotDung INT NULL CHECK(GioiHanLuotDung>0), SoLuotDaDung INT NOT NULL DEFAULT 0 CHECK(SoLuotDaDung>=0),
+    MaCode VARCHAR(40) NOT NULL UNIQUE, DoiTuongApDung VARCHAR(10) NOT NULL DEFAULT ''ALL'' CHECK(DoiTuongApDung IN (''ALL'',''MEMBER'')), MaChiNhanh INT NULL REFERENCES ChiNhanh(MaChiNhanh), GioiHanLuotDung INT NULL CHECK(GioiHanLuotDung>0), SoLuotDaDung INT NOT NULL DEFAULT 0 CHECK(SoLuotDaDung>=0),
     TenChuongTrinh NVARCHAR(150) NOT NULL,
     LoaiKhuyenMai VARCHAR(10) NOT NULL CHECK(LoaiKhuyenMai IN (''PERCENT'',''FIXED'')),
     GiaTriGiam DECIMAL(18,2) NOT NULL CHECK(GiaTriGiam>0),
@@ -216,6 +216,8 @@ EXEC(N'CREATE TABLE dbo.ChiTietDon_Topping (
     SoLuong INT NOT NULL CHECK(SoLuong BETWEEN 1 AND 5),
     PRIMARY KEY(MaChiTietDon,MaTopping)
 );');
+-- Bổ sung đối tượng áp dụng voucher cho database v4 đã tạo trước đó (chạy lại an toàn).
+IF COL_LENGTH(N'dbo.ChuongTrinhKhuyenMai',N'DoiTuongApDung') IS NULL EXEC(N'ALTER TABLE dbo.ChuongTrinhKhuyenMai ADD DoiTuongApDung VARCHAR(10) NOT NULL CONSTRAINT DF_KM_DoiTuong DEFAULT ''ALL'' CONSTRAINT CK_KM_DoiTuong CHECK(DoiTuongApDung IN (''ALL'',''MEMBER''))');
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'UX_Shift_Open' AND object_id=OBJECT_ID(N'dbo.PhienLamViecPOS')) EXEC(N'CREATE UNIQUE INDEX UX_Shift_Open ON dbo.PhienLamViecPOS(MaChiNhanh) WHERE TrangThai=''open'';');
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'UX_Attendance_Open' AND object_id=OBJECT_ID(N'dbo.BangChamCong')) EXEC(N'CREATE UNIQUE INDEX UX_Attendance_Open ON dbo.BangChamCong(MaNhanVien) WHERE ThoiGianCheckOut IS NULL;');
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'UX_Staff_Phone' AND object_id=OBJECT_ID(N'dbo.NhanVien')) EXEC(N'CREATE UNIQUE INDEX UX_Staff_Phone ON dbo.NhanVien(SoDienThoai) WHERE SoDienThoai IS NOT NULL;');

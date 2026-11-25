@@ -28,7 +28,14 @@ const setStatus = route(async (req, res) =>
     ...(await model.setStatus(req.params.id, req.body, req.user)),
   }),
 );
+const removePromotion = route(async (req, res) =>
+  res.json({
+    success: true,
+    ...(await model.remove(req.params.id, req.user)),
+  }),
+);
 module.exports = {
+  removePromotion,
   setStatus,
   getCustomers,
   getPromotions,

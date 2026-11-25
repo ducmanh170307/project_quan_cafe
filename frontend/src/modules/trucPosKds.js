@@ -1,11 +1,13 @@
 import { ApiClient, UI } from "../services/api.js";
 import { BillQuote } from "../services/billing.js";
+import { OptionPicker, lineKey, optionText } from "../services/optionPicker.js";
 import { ManhModule } from "./manhBranchHr.js";
 import { YModule } from "./yShiftCashflow.js";
 const TrucModule = {
   products: [],
   toppings: [],
   vouchers: [],
+  category: "",
   cart: [],
   orders: [],
   kdsOrders: [],
@@ -19,6 +21,8 @@ const TrucModule = {
       MaSanPham: c.MaSanPham,
       TenSize: c.TenSize,
       SoLuong: c.SoLuong,
+      MucDuong: c.MucDuong,
+      MucDa: c.MucDa,
       GhiChu: c.GhiChu,
       Toppings: c.Toppings.map((t) => ({
         MaTopping: t.MaTopping,
@@ -26,12 +30,18 @@ const TrucModule = {
       })),
     }));
   },
+  /** Chỉ gửi số điện thoại khi đã nhập đủ/đúng, để voucher "chỉ cho thành viên" được kiểm tra đúng. */
+  customerPhone() {
+    const phone = UI.value("posPhone");
+    return /^0\d{9,10}$/.test(phone) ? phone : "";
+  },
   getBill() {
     if (!this.bill)
       this.bill = new BillQuote({
         endpoint: "/orders/quote",
         getPayload: () => ({
           MaChiNhanh: ManhModule.currentBranchId,
+          SoDienThoaiKhach: this.customerPhone(),
           Items: this.items(),
         }),
         onChange: () => this.renderBill(),
@@ -43,7 +53,9 @@ const TrucModule = {
     this.toppings = [];
     this.vouchers = [];
     this.cart = [];
+    this.category = "";
     this.orders = [];
+    this.orderPage = 1;
     this.kdsOrders = [];
     this.requestKey = null;
     this.requestSignature = null;
@@ -60,6 +72,7 @@ const TrucModule = {
     this.renderPosMenu();
     this.renderKds();
     UI.el("orderTableBody").innerHTML = "";
+    UI.el("orderPager").innerHTML = "";
   },
   hydrateProducts(products, toppings = [], vouchers = []) {
     this.products = products;
@@ -72,83 +85,100 @@ const TrucModule = {
       vouchers
         .map(
           (v) =>
-            `<option value="${UI.escape(v.MaCode)}">${UI.escape(v.MaCode)} · ${UI.escape(v.TenChuongTrinh)}</option>`,
+            `<option value="${UI.escape(v.MaCode)}">${UI.escape(v.MaCode)} · ${UI.escape(v.TenChuongTrinh)}${v.DoiTuongApDung === "MEMBER" ? " [Thành viên]" : ""}</option>`,
         )
         .join("");
     if (vouchers.some((v) => v.MaCode === selected))
       UI.el("posVoucherSelect").value = selected;
+    this.renderVoucherInfo();
   },
+  /** Mô tả điều kiện của voucher đang chọn: giảm bao nhiêu, đơn tối thiểu, hạn, đối tượng. */
+  renderVoucherInfo() {
+    const v = this.vouchers.find(
+        (x) => x.MaCode === UI.value("posVoucherSelect"),
+      ),
+      box = UI.el("posVoucherInfo");
+    box.textContent = v
+      ? `Giảm ${UI.money(v.GiaTriGiam)}${v.LoaiKhuyenMai === "PERCENT" ? "%" : "đ"}${v.GiamToiDa ? ` (tối đa ${UI.money(v.GiamToiDa)}đ)` : ""} · đơn từ ${UI.money(v.DonToiThieu)}đ · dùng đến ${UI.date(v.NgayKetThuc)} · ${v.DoiTuongApDung === "MEMBER" ? "chỉ khách thành viên (cần nhập SĐT)" : "mọi khách"}`
+      : "";
+    box.hidden = !v;
+  },
+  orderPage: 1,
   hydrateOrders(rows) {
     this.orders = rows;
+    this.renderOrders();
+  },
+  moveOrderPage(delta) {
+    this.orderPage += delta;
     this.renderOrders();
   },
   hydrateKds(rows) {
     this.kdsOrders = rows;
     this.renderKds();
   },
+  /** Danh mục lấy từ chính danh sách món đang bán ở chi nhánh. */
+  categories() {
+    const map = new Map();
+    for (const p of this.products)
+      if (!map.has(p.MaDanhMuc))
+        map.set(p.MaDanhMuc, { id: p.MaDanhMuc, name: p.TenDanhMuc, count: 0 });
+    for (const p of this.products) map.get(p.MaDanhMuc).count++;
+    return [...map.values()];
+  },
+  setCategory(id) {
+    this.category = String(id);
+    this.renderPosMenu();
+  },
   renderPosMenu() {
-    const selections = new Map(
-      [...UI.el("posProductGrid").querySelectorAll("select")].map((s) => [
-        s.id,
-        [...s.selectedOptions].map((o) => o.value),
-      ]),
-    );
     const text = UI.value("posSearch").toLocaleLowerCase("vi"),
-      kind = UI.value("posKind");
+      kind = UI.value("posKind"),
+      categories = this.categories();
+    if (this.category && !categories.some((c) => String(c.id) === this.category))
+      this.category = "";
+    UI.el("posCategories").innerHTML =
+      `<button class="pill ${this.category ? "" : "active"}" onclick="TrucModule.setCategory('')">Tất cả (${this.products.length})</button>` +
+      categories
+        .map(
+          (c) =>
+            `<button class="pill ${String(c.id) === this.category ? "active" : ""}" onclick="TrucModule.setCategory(${c.id})">${UI.escape(c.name)} (${c.count})</button>`,
+        )
+        .join("");
     UI.el("posProductGrid").innerHTML =
       this.products
         .map((p, index) => ({ p, index }))
         .filter(
           ({ p }) =>
             (!kind || p.LoaiSanPham === kind) &&
+            (!this.category || String(p.MaDanhMuc) === this.category) &&
             p.TenSanPham.toLocaleLowerCase("vi").includes(text),
         )
         .map(
           ({ p, index }) =>
-            `<article class="card product-card"><img class="product-photo" src="${UI.escape(p.HinhAnh || "/src/assets/menu/placeholder.svg")}" alt="${UI.escape(p.TenSanPham)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='/src/assets/menu/placeholder.svg'"><b>${UI.escape(p.TenSanPham)} · ${UI.escape(p.TenSize === "PHAN" ? "Phần" : p.TenSize)}</b><p>${UI.money(p.GiaBan)} đ</p>${p.LoaiSanPham === "MON_AN" ? "" : `<label class="muted">Topping (có thể chọn nhiều)</label><select multiple id="posToppings_${p.MaSanPham}_${p.TenSize}" aria-label="Topping">${this.toppings.map((t) => `<option value="${t.MaTopping}">${UI.escape(t.TenTopping)} +${UI.money(t.GiaBan)}đ</option>`).join("")}</select>`}<button class="btn btn-green" onclick="TrucModule.addToCart(${index})">+ Chọn món</button></article>`,
+            `<article class="card product-card"><img class="product-photo" src="${UI.escape(p.HinhAnh || "/src/assets/menu/placeholder.svg")}" alt="${UI.escape(p.TenSanPham)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='/src/assets/menu/placeholder.svg'"><b>${UI.escape(p.TenSanPham)} · ${UI.escape(p.TenSize === "PHAN" ? "Phần" : p.TenSize)}</b><small class="muted">${UI.escape(p.TenDanhMuc)}</small><p>${UI.money(p.GiaBan)} đ</p><button class="btn btn-green" onclick="TrucModule.addToCart(${index})">${p.LoaiSanPham === "MON_AN" ? "+ Thêm vào giỏ" : "Chọn đường, đá, topping"}</button></article>`,
         )
         .join("") || '<p class="muted">Không có món phù hợp.</p>';
-    for (const select of UI.el("posProductGrid").querySelectorAll("select"))
-      for (const option of select.options)
-        option.selected = (selections.get(select.id) || []).includes(
-          option.value,
-        );
   },
   addToCart(index) {
     if (this.checkingOut) return;
     const p = this.products[index];
     if (!p) return;
-    const select = UI.el(`posToppings_${p.MaSanPham}_${p.TenSize}`),
-      chosen = select
-        ? [...select.selectedOptions]
-            .map((o) =>
-              this.toppings.find((t) => t.MaTopping === Number(o.value)),
-            )
-            .sort((a, b) => a.MaTopping - b.MaTopping)
-        : [],
-      Toppings = chosen.map((t) => ({
-        MaTopping: t.MaTopping,
+    if (p.LoaiSanPham === "MON_AN")
+      return this.pushLine(p, {
         SoLuong: 1,
-        TenTopping: t.TenTopping,
-      })),
-      key = JSON.stringify(Toppings.map((t) => t.MaTopping));
-    const old = this.cart.find(
-      (c) =>
-        c.MaSanPham === p.MaSanPham &&
-        c.TenSize === p.TenSize &&
-        JSON.stringify(c.Toppings.map((t) => t.MaTopping)) === key,
-    );
-    if (old) old.SoLuong++;
-    else
-      this.cart.push({
-        ...p,
-        GiaBan:
-          Number(p.GiaBan) +
-          chosen.reduce((sum, t) => sum + Number(t.GiaBan), 0),
-        SoLuong: 1,
+        MucDuong: "100%",
+        MucDa: "100%",
         GhiChu: "",
-        Toppings,
+        Toppings: [],
+        GiaBan: Number(p.GiaBan),
       });
+    // Đồ uống: mở hộp chọn đường/đá/topping trước khi vào giỏ.
+    OptionPicker.open(p, this.toppings, (choice) => this.pushLine(p, choice));
+  },
+  pushLine(p, choice) {
+    const line = { ...p, ...choice },
+      old = this.cart.find((c) => lineKey(c) === lineKey(line));
+    if (old) old.SoLuong += line.SoLuong;
+    else this.cart.push(line);
     this.touchCart();
   },
   changeQty(index, delta) {
@@ -171,7 +201,7 @@ const TrucModule = {
       this.cart
         .map(
           (c, index) =>
-            `<tr><td>${UI.escape(c.TenSanPham)} · ${UI.escape(c.TenSize === "PHAN" ? "Phần" : c.TenSize)}<br><small>${c.Toppings.map((t) => UI.escape(t.TenTopping)).join(", ")}</small><br><input aria-label="Ghi chú món" maxlength="300" value="${UI.escape(c.GhiChu)}" onchange="TrucModule.setNote(${index},this.value)"></td><td><div class="cart-qty"><button class="btn small-btn" onclick="TrucModule.changeQty(${index},-1)">−</button>${c.SoLuong}<button class="btn small-btn" onclick="TrucModule.changeQty(${index},1)">+</button></div></td><td>${UI.money(c.GiaBan * c.SoLuong)}</td><td><button class="btn small-btn" onclick="TrucModule.changeQty(${index},-${c.SoLuong})">Xóa</button></td></tr>`,
+            `<tr><td>${UI.escape(c.TenSanPham)} · ${UI.escape(c.TenSize === "PHAN" ? "Phần" : c.TenSize)}<br><small class="line-options">${UI.escape(optionText(c))}</small><br><input aria-label="Ghi chú món" maxlength="300" value="${UI.escape(c.GhiChu)}" onchange="TrucModule.setNote(${index},this.value)"></td><td><div class="cart-qty"><button class="btn small-btn" onclick="TrucModule.changeQty(${index},-1)">−</button>${c.SoLuong}<button class="btn small-btn" onclick="TrucModule.changeQty(${index},1)">+</button></div></td><td>${UI.money(c.GiaBan * c.SoLuong)}</td><td><button class="btn small-btn" onclick="TrucModule.changeQty(${index},-${c.SoLuong})">Xóa</button></td></tr>`,
         )
         .join("") || UI.empty(4, "Chọn đồ uống hoặc món ăn");
     this.renderBill();
@@ -213,10 +243,12 @@ const TrucModule = {
   async clearVoucher() {
     UI.el("posVoucher").value = "";
     UI.el("posVoucherSelect").value = "";
+    this.renderVoucherInfo();
     await this.getBill().update("");
   },
   async pickVoucher(code) {
     UI.el("posVoucher").value = code;
+    this.renderVoucherInfo();
     await this.applyVoucher();
   },
   payment() {
@@ -277,11 +309,14 @@ const TrucModule = {
     }
   },
   renderOrders() {
+    const page = UI.paginate(this.orders, this.orderPage, 8);
+    this.orderPage = page.page;
+    UI.el("orderPager").innerHTML = UI.pagerHtml(page, "TrucModule.moveOrderPage");
     UI.el("orderTableBody").innerHTML =
-      this.orders
+      page.items
         .map(
           (o) =>
-            `<tr><td>${UI.escape(o.MaDonHienThi)}<br><small>${UI.date(o.ThoiGianDat)}</small></td><td>${UI.escape(o.TenKhachHang || "Khách lẻ")}<br>${UI.escape(o.SoDienThoaiKhach)}<br>${o.Items.map((l) => `${UI.escape(l.TenSanPhamLuuTru)} ${UI.escape(l.TenSize === "PHAN" ? "Phần" : l.TenSize)} × ${l.SoLuong}`).join("<br>")}</td><td>${UI.money(o.TongPhaiTra)}<br><small>${UI.escape(o.MaCode || "")}</small></td><td>${UI.escape(o.TrangThaiThanhToan)}</td><td>${UI.escape(o.TrangThaiDonHang)}</td><td><button class="btn small-btn" onclick="UI.run(this,()=>TrucModule.showReceipt(${o.MaDonHang}))">Hóa đơn</button>${o.TrangThaiThanhToan === "unpaid" && o.TrangThaiDonHang !== "Cancelled" ? `<button class="btn btn-green small-btn" onclick="UI.run(this,()=>TrucModule.payOnline(${o.MaDonHang}))">Thu tiền</button>` : ""}${o.TrangThaiDonHang !== "Cancelled" && (o.TrangThaiThanhToan === "unpaid" || ManhModule.isManager) ? `<button class="btn btn-red small-btn" onclick="UI.run(this,()=>TrucModule.cancel(${o.MaDonHang}))">Hủy / hoàn</button>` : ""}</td></tr>`,
+            `<tr><td>${UI.escape(o.MaDonHienThi)}<br><small>${UI.date(o.ThoiGianDat)}</small></td><td>${UI.escape(o.TenKhachHang || "Khách lẻ")}<br>${UI.escape(o.SoDienThoaiKhach)}<br>${o.Items.map((l) => `${UI.escape(l.TenSanPhamLuuTru)} ${UI.escape(l.TenSize === "PHAN" ? "Phần" : l.TenSize)} × ${l.SoLuong}${l.MucDuong && l.TenSize !== "PHAN" ? `<br><small>Đường ${UI.escape(l.MucDuong)} · Đá ${UI.escape(l.MucDa)}${l.ToppingMoTa ? " · " + UI.escape(l.ToppingMoTa) : ""}</small>` : ""}`).join("<br>")}</td><td>${UI.money(o.TongPhaiTra)}<br><small>${UI.escape(o.MaCode || "")}</small></td><td>${UI.escape(o.TrangThaiThanhToan)}</td><td>${UI.escape(o.TrangThaiDonHang)}</td><td><button class="btn small-btn" onclick="UI.run(this,()=>TrucModule.showReceipt(${o.MaDonHang}))">Hóa đơn</button>${o.TrangThaiThanhToan === "unpaid" && o.TrangThaiDonHang !== "Cancelled" ? `<button class="btn btn-green small-btn" onclick="UI.run(this,()=>TrucModule.payOnline(${o.MaDonHang}))">Thu tiền</button>` : ""}${o.TrangThaiDonHang !== "Cancelled" && (o.TrangThaiThanhToan === "unpaid" || ManhModule.isManager) ? `<button class="btn btn-red small-btn" onclick="UI.run(this,()=>TrucModule.cancel(${o.MaDonHang}))">Hủy / hoàn</button>` : ""}</td></tr>`,
         )
         .join("") || UI.empty(6);
   },
@@ -354,7 +389,7 @@ const TrucModule = {
       [...map.values()]
         .map(
           (o) =>
-            `<tr><td><b>#${o.SoThuTuGoiMon}</b><br>${UI.escape(o.MaDonHienThi)}<br>${UI.date(o.ThoiGianDat)}</td><td>${o.Items.map((l) => `<p><b>${UI.escape(l.TenSanPhamLuuTru)} · ${UI.escape(l.TenSize === "PHAN" ? "Phần" : l.TenSize)} × ${l.SoLuong}</b><br>${UI.escape(l.ToppingMoTa || "")}<br>${UI.escape(l.GhiChuMon || "")}<br><small>Làm lại ${l.SoLanLamLai} món</small>${canMake ? ` <button class="btn small-btn" onclick="UI.run(this,()=>TrucModule.remake(${o.MaDonHang},${l.MaChiTietDon}))">Làm lại</button>` : ""}</p>`).join("")}</td><td>${UI.escape(o.TrangThaiDonHang)}</td><td>${canMake ? `<button class="btn btn-green" onclick="UI.run(this,()=>TrucModule.completeKdsOrder(${o.MaDonHang}))">Hoàn tất & giao món</button>` : "Chế độ xem"}</td></tr>`,
+            `<tr><td><b>#${o.SoThuTuGoiMon}</b><br>${UI.escape(o.MaDonHienThi)}<br>${UI.date(o.ThoiGianDat)}</td><td>${o.Items.map((l) => `<p><b>${UI.escape(l.TenSanPhamLuuTru)} · ${UI.escape(l.TenSize === "PHAN" ? "Phần" : l.TenSize)} × ${l.SoLuong}</b><br>${l.TenSize === "PHAN" ? "" : `Đường ${UI.escape(l.MucDuong)} · Đá ${UI.escape(l.MucDa)}`}<br>${UI.escape(l.ToppingMoTa || "")}<br>${UI.escape(l.GhiChuMon || "")}<br><small>Làm lại ${l.SoLanLamLai} món</small>${canMake ? ` <button class="btn small-btn" onclick="UI.run(this,()=>TrucModule.remake(${o.MaDonHang},${l.MaChiTietDon}))">Làm lại</button>` : ""}</p>`).join("")}</td><td>${UI.escape(o.TrangThaiDonHang)}</td><td>${canMake ? `<button class="btn btn-green" onclick="UI.run(this,()=>TrucModule.completeKdsOrder(${o.MaDonHang}))">Hoàn tất & giao món</button>` : "Chế độ xem"}</td></tr>`,
         )
         .join("") || UI.empty(4, "Không có đơn chờ chuẩn bị");
   },
@@ -381,7 +416,7 @@ const TrucModule = {
   async showReceipt(id) {
     const { order } = await ApiClient.get(`/orders/${id}`);
     UI.el("receiptContent").innerHTML =
-      `<h2>KIOTCAFE</h2><p>${UI.escape(order.MaDonHienThi)}</p><p>${UI.date(order.ThoiGianDat)} · ${UI.escape(order.TrangThaiThanhToan)}</p><table><thead><tr><th>Món</th><th>SL</th><th>Tiền</th></tr></thead><tbody>${order.Items.map((l) => `<tr><td>${UI.escape(l.TenSanPhamLuuTru)} ${UI.escape(l.TenSize === "PHAN" ? "Phần" : l.TenSize)}<br><small>${UI.escape(l.ToppingMoTa || "")}</small></td><td>${l.SoLuong}</td><td>${UI.money(l.SoLuong * l.DonGiaBan)}</td></tr>`).join("")}</tbody></table><p class="section-gap">Tiền hàng ${UI.money(order.TongTienHang)}đ<br>Voucher ${UI.escape(order.MaCode || "—")} · Giảm ${UI.money(order.TienGiamGia)}đ</p><p class="receipt-total">Tổng ${UI.money(order.TongPhaiTra)}đ</p><p>Hóa đơn nội bộ · Cảm ơn quý khách!</p>`;
+      `<h2>KIOTCAFE</h2><p>${UI.escape(order.MaDonHienThi)}</p><p>${UI.date(order.ThoiGianDat)} · ${UI.escape(order.TrangThaiThanhToan)}</p><table><thead><tr><th>Món</th><th>SL</th><th>Tiền</th></tr></thead><tbody>${order.Items.map((l) => `<tr><td>${UI.escape(l.TenSanPhamLuuTru)} ${UI.escape(l.TenSize === "PHAN" ? "Phần" : l.TenSize)}<br><small>${l.TenSize === "PHAN" ? "" : `Đường ${UI.escape(l.MucDuong)} · Đá ${UI.escape(l.MucDa)}`}${l.ToppingMoTa ? " · " + UI.escape(l.ToppingMoTa) : ""}${l.GhiChuMon ? "<br>Ghi chú: " + UI.escape(l.GhiChuMon) : ""}</small></td><td>${l.SoLuong}</td><td>${UI.money(l.SoLuong * l.DonGiaBan)}</td></tr>`).join("")}</tbody></table><p class="section-gap">Tiền hàng ${UI.money(order.TongTienHang)}đ<br>Voucher ${UI.escape(order.MaCode || "—")} · Giảm ${UI.money(order.TienGiamGia)}đ</p><p class="receipt-total">Tổng ${UI.money(order.TongPhaiTra)}đ</p><p>Hóa đơn nội bộ · Cảm ơn quý khách!</p>`;
     UI.el("receiptDialog").showModal();
   },
 };

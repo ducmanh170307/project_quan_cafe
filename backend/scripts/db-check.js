@@ -1,4 +1,3 @@
-// Như Ý phụ trách kiểm thử.
 const db = require("../src/config/db");
 (async () => {
   try {

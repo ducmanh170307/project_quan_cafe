@@ -88,6 +88,7 @@ async function capture(tx, order, shiftId, payment, actor) {
     voucher,
     new Date(),
     order.MaChiNhanh,
+    !!order.MaKhachHang,
   );
   const revisedTotal = Number(order.TongTienHang) - discount;
   if (payment.TongDuKien !== undefined)
@@ -128,7 +129,7 @@ async function capture(tx, order, shiftId, payment, actor) {
     "Thu ngân cần xác nhận đã kiểm tra giao dịch thẻ/chuyển khoản.",
   );
 
-  await promos.claim(voucher, order.MaChiNhanh, tx);
+  await promos.claim(voucher, order.MaChiNhanh, tx, !!order.MaKhachHang);
   await db.query(
     `/* order:payment */ INSERT INTO GiaoDichThanhToan(MaDonHang,MaPhienCa,PhuongThuc,LoaiGiaoDich,SoTienThanhToan,TienKhachDua,TienThuaTraKhach,NguoiTao) VALUES(@id,@shift,@method,'PAYMENT',@total,@tendered,@change,@actor); UPDATE DonHang SET MaPhienCa=@shift,TrangThaiThanhToan='paid',TrangThaiDonHang='Preparing' WHERE MaDonHang=@id`,
     {
@@ -233,6 +234,7 @@ async function createOrderTransaction(data, actor = null, online = false) {
         promo,
         await products.getToppings(null, tx),
         branch,
+        !!normalized.phone,
       ),
       customerId = await customer(normalized, tx);
     if (data.TongDuKien !== undefined)
@@ -318,6 +320,7 @@ async function quote(data, actor = null, online = false) {
     promo,
     await products.getToppings(),
     branch,
+    !!v.phone(data.SoDienThoaiKhach, true),
   );
   return {
     ...totals,
@@ -346,6 +349,7 @@ async function quotePayment(data, actor) {
       promo,
       new Date(),
       branch,
+      !!order.MaKhachHang,
     );
   return {
     subtotal: Number(order.TongTienHang),
@@ -464,7 +468,7 @@ async function detail(id, actor) {
     { id: orderId },
   );
   const lines = await db.query(
-    "SELECT TenSanPhamLuuTru,TenSize,SoLuong,DonGiaBan,ToppingMoTa FROM HangDoiPhaChe_KDS WHERE MaDonHang=@id",
+    "SELECT TenSanPhamLuuTru,TenSize,SoLuong,DonGiaBan,MucDuong,MucDa,GhiChuMon,ToppingMoTa FROM HangDoiPhaChe_KDS WHERE MaDonHang=@id",
     { id: orderId },
   );
   return { ...r.recordset[0], Items: lines.recordset };

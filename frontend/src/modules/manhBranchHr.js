@@ -698,7 +698,6 @@ const ManhModule = {
     this.showLogin();
     UI.notify(r.message);
   },
-  // Mạnh: tải và hiển thị báo cáo chi nhánh.
   async loadReport() {
     const branch = this.currentBranchId,
       d = await ApiClient.get(

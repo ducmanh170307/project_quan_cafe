@@ -20,6 +20,16 @@
 
 Sau khi bỏ kho còn 7 bộ MVC; phần ảnh/menu và báo giá dùng chung được giao thêm cho Linh. Vai trò tài khoản dùng để phân quyền, còn **vị trí làm trong ca** là lựa chọn riêng khi xếp lịch.
 
+## Bổ sung theo góp ý của thầy
+
+- **POS có thanh danh mục** và hộp chọn đồ uống: chọn nhiều topping kèm số lượng (có nút chọn tất cả), mức **đường** và mức **đá**, ghi chú. Dòng "Đã chọn" hiện ngay bên dưới; giỏ hàng, hóa đơn và KDS đều hiển thị đường/đá/topping. Trang khách đặt món dùng chung hộp chọn này.
+- **Voucher**: thêm *đối tượng áp dụng* (mọi khách / chỉ khách thành viên). Có nút **Xóa** voucher (chỉ xóa được voucher chưa dùng trong đơn nào; đã dùng thì chỉ Tắt). Bảng quản lý có tình trạng *Đang chạy / Sắp diễn ra / Đã tắt / Hết hạn / Hết lượt* và bộ lọc theo bật-tắt, thời gian, đối tượng. POS chỉ liệt kê voucher dùng được và mô tả điều kiện.
+- **Mở ca / chốt ca** hiển thị theo trạng thái: chưa có ca thì chỉ hiện bước Mở ca; có ca thì ẩn form mở ca. Tiền đầu ca gợi ý bằng tiền chốt ca trước, lệch phải ghi lý do.
+- **Nhân sự** tách thành ba phần: Lịch phân ca (xếp theo **từ ngày – đến ngày** và chọn các thứ trong tuần, tối đa 31 ngày mỗi lần), Chấm công (có "Ca làm của tôi hôm nay"), Tài khoản nhân viên. Đăng xuất khi chưa check-out sẽ có cảnh báo.
+- **Kịch bản chạy demo** từng bước: `docs/KICH_BAN_THUYET_TRINH.md`.
+
+Nâng cấp từ database v4 đã có: chạy lại `01_create_database.sql` (tự thêm cột `DoiTuongApDung`) rồi `02_insert_data.sql`.
+
 ## Cài đặt trong VS Code
 
 Cần Node.js từ 22 trở lên và SQL Server 2017 trở lên. Giải nén toàn bộ ZIP, mở thư mục có `package.json` trong VS Code.
@@ -78,6 +88,6 @@ npm test
 npm run test:sql
 ```
 
-`check` kiểm tra cú pháp/import/tài nguyên. `npm test`: **60 kiểm thử tự động đã đạt**, dùng tầng SQL giả lập. Đã kiểm tra **20 nhóm thao tác trình duyệt** với API fixture. Chưa chạy với SQL Server thật trong môi trường soạn mã; `test:sql` tạo database test riêng để nhóm xác nhận schema/seed và giao dịch thật. Xem `docs/KIEM_THU.md`.
+`check` kiểm tra cú pháp/import/tài nguyên. `npm test`: **66 kiểm thử tự động đã đạt**, dùng tầng SQL giả lập. Đã kiểm tra **20 nhóm thao tác trình duyệt** với API fixture. Chưa chạy với SQL Server thật trong môi trường soạn mã; `test:sql` tạo database test riêng để nhóm xác nhận schema/seed và giao dịch thật. Xem `docs/KIEM_THU.md`.
 
 Thanh toán thẻ/chuyển khoản hiện do thu ngân xác nhận thủ công; chưa tích hợp cổng thanh toán, hóa đơn điện tử hay tính lương chính thức. Chấm công theo ca không xác minh vị trí GPS thực tế.

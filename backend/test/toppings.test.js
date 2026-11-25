@@ -1,4 +1,3 @@
-// Như Ý phụ trách kiểm thử.
 const { test } = require("node:test"),
   assert = require("node:assert/strict"),
   { randomUUID } = require("node:crypto");

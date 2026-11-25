@@ -8,10 +8,3 @@ coverage/
 .DS_Store
 
 backend/uploads/
-
-node_modules/
-.env
-.env.*
-!.env.example
-*.log
-backend/uploads/

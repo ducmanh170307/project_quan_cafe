@@ -1,7 +1,12 @@
 import { ApiClient, UI } from "../services/api.js";
 import { ManhModule } from "./manhBranchHr.js";
-/* Như Ý: ca POS, thu chi và két. Linh: voucher và khách thành viên. */
+/* Ý: ca POS, phiếu thu chi, đối soát và Voucher/CRM. */
+const PAGE_SIZE = 8;
 const YModule = {
+  promos: [],
+  promoPage: 1,
+  customers: [],
+  customerPage: 1,
   lastClosed: null,
   activeShift: null,
   theoreticalMoney: 0,
@@ -17,10 +22,7 @@ const YModule = {
     UI.el("shiftSummary").textContent = "";
     UI.el("shiftReconcileResult").textContent = "";
     UI.el("differencePreview").textContent = "";
-    const openingMoney = UI.el("openShiftMoney");
-    openingMoney.value = openingMoney.defaultValue;
-    delete openingMoney.dataset.touched;
-    UI.el("openShiftReason").value = "";
+    delete UI.el("openShiftMoney").dataset.touched;
     UI.el("shiftBanner").textContent = "Đang tải trạng thái ca...";
     UI.el("shiftBanner").className = "status-banner";
     UI.el("posShiftWarning").hidden = true;
@@ -134,18 +136,11 @@ const YModule = {
     await ManhModule.refresh();
   },
   async createCashflow() {
-    const shiftId = this.requireShift(),
-      type = UI.value("cashflowType"),
-      amount = Number(UI.value("cashflowAmount")),
-      reason = UI.value("cashflowReason");
-    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1e12)
-      throw new Error("Số tiền thu chi phải là số nguyên từ 1 đến 1.000.000.000.000đ.");
-    if (!reason) throw new Error("Vui lòng nhập lý do thu chi.");
     const r = await ApiClient.post("/shifts/cashflow", {
-      MaPhienCa: shiftId,
-      LoaiPhieu: type,
-      SoTien: amount,
-      LyDo: reason,
+      MaPhienCa: this.requireShift(),
+      LoaiPhieu: UI.value("cashflowType"),
+      SoTien: UI.value("cashflowAmount"),
+      LyDo: UI.value("cashflowReason"),
     });
     UI.el("cashflowAmount").value = "";
     UI.el("cashflowReason").value = "";
@@ -153,24 +148,18 @@ const YModule = {
     await ManhModule.refresh();
   },
   async closeShift() {
-    const branchId = ManhModule.currentBranchId,
-      user = ManhModule.user;
     const r = await ApiClient.post("/shifts/close", {
       MaPhienCa: this.requireShift(),
       TienMatThucTeCuoiCa: UI.value("actualCash"),
       LyDoChenhLechCuoiCa: UI.value("closeShiftReason"),
     });
-    if (ManhModule.currentBranchId !== branchId || ManhModule.user !== user)
-      return;
-    UI.el("actualCash").value = "";
-    UI.el("closeShiftReason").value = "";
-    UI.el("openShiftReason").value = "";
-    delete UI.el("openShiftMoney").dataset.touched;
-    UI.el("differencePreview").textContent = "";
+    await ManhModule.refresh();
     UI.el("shiftReconcileResult").textContent =
       `Lý thuyết ${UI.money(r.theoreticalCash)}đ · Thực đếm ${UI.money(r.actualCash)}đ · Chênh lệch ${UI.money(r.difference)}đ`;
     UI.notify(r.message);
-    await ManhModule.refresh();
+    UI.el("actualCash").value = "";
+    delete UI.el("openShiftMoney").dataset.touched;
+    UI.el("differencePreview").textContent = "";
   },
   async createPromo() {
     const start = UI.value("promoStart"),
@@ -185,6 +174,7 @@ const YModule = {
       DonToiThieu: UI.value("promoMin"),
       GiamToiDa: UI.value("promoMax"),
       MaChiNhanh: UI.value("promoBranch"),
+      DoiTuongApDung: UI.value("promoAudience"),
       GioiHanLuotDung: UI.value("promoLimit"),
       NgayBatDau: new Date(start).toISOString(),
       NgayKetThuc: new Date(end).toISOString(),
@@ -202,13 +192,68 @@ const YModule = {
       UI.el("promoBranch").value = ManhModule.currentBranchId;
     else if (ManhModule.branches.some((b) => String(b.MaChiNhanh) === selected))
       UI.el("promoBranch").value = selected;
+    this.promos = rows;
+    this.renderPromos();
+  },
+  /** Tình trạng thực tế của voucher = bật/tắt + thời gian + lượt dùng. */
+  promoState(p, now = new Date()) {
+    if (p.TrangThai !== "active")
+      return { key: "inactive", label: "Đã tắt", css: "badge-off" };
+    if (new Date(p.NgayBatDau) > now)
+      return { key: "upcoming", label: "Sắp diễn ra", css: "badge-wait" };
+    if (new Date(p.NgayKetThuc) < now)
+      return { key: "expired", label: "Đã hết hạn", css: "badge-off" };
+    if (p.GioiHanLuotDung != null && p.SoLuotDaDung >= p.GioiHanLuotDung)
+      return { key: "exhausted", label: "Hết lượt", css: "badge-off" };
+    return { key: "running", label: "Đang chạy", css: "badge-on" };
+  },
+  filterPromos() {
+    this.promoPage = 1;
+    this.renderPromos();
+  },
+  movePromoPage(delta) {
+    this.promoPage += delta;
+    this.renderPromos();
+  },
+  renderPromos() {
+    const rows = this.promos || [],
+      text = UI.value("promoSearch").toLocaleLowerCase("vi"),
+      status = UI.value("promoFilterStatus"),
+      time = UI.value("promoFilterTime"),
+      audience = UI.value("promoFilterAudience"),
+      now = new Date(),
+      withState = rows.map((p) => ({ p, st: this.promoState(p, now) }));
+    const count = (key) => withState.filter((x) => x.st.key === key).length;
+    UI.el("promoSummary").innerHTML =
+      `<span class="badge badge-on">Đang chạy ${count("running")}</span><span class="badge badge-wait">Sắp diễn ra ${count("upcoming")}</span><span class="badge badge-off">Đã tắt ${count("inactive")}</span><span class="badge badge-off">Hết hạn / hết lượt ${count("expired") + count("exhausted")}</span>`;
+    const shown = withState.filter(
+      ({ p, st }) =>
+        (!text ||
+          `${p.MaCode} ${p.TenChuongTrinh}`.toLocaleLowerCase("vi").includes(text)) &&
+        (!status || p.TrangThai === status) &&
+        (!time || st.key === time) &&
+        (!audience || (p.DoiTuongApDung || "ALL") === audience),
+    );
+    const page = UI.paginate(shown, this.promoPage, PAGE_SIZE);
+    this.promoPage = page.page;
+    UI.el("promoPager").innerHTML = UI.pagerHtml(page, "YModule.movePromoPage");
     UI.el("promoTableBody").innerHTML =
-      rows
+      page.items
         .map(
-          (p) =>
-            `<tr><td><b>${UI.escape(p.MaCode)}</b><br>${UI.escape(p.TenChuongTrinh)}</td><td>${UI.money(p.GiaTriGiam)}${p.LoaiKhuyenMai === "PERCENT" ? "%" : "đ"}<br>Từ ${UI.money(p.DonToiThieu)}đ${p.GiamToiDa ? `<br>Tối đa ${UI.money(p.GiamToiDa)}đ` : ""}</td><td>${UI.escape(p.TenChiNhanh || "Toàn chuỗi")}<br>${UI.date(p.NgayKetThuc)}</td><td>${p.SoLuotDaDung || 0} / ${p.GioiHanLuotDung ?? "∞"}</td><td>${UI.escape(p.TrangThai)}</td><td><button class="btn small-btn" onclick="UI.run(this,()=>YModule.togglePromo(${p.MaKhuyenMai},'${p.TrangThai === "active" ? "inactive" : "active"}'))">${p.TrangThai === "active" ? "Tắt" : "Bật"}</button></td></tr>`,
+          ({ p, st }) =>
+            `<tr><td><b>${UI.escape(p.MaCode)}</b><br>${UI.escape(p.TenChuongTrinh)}</td><td>${UI.money(p.GiaTriGiam)}${p.LoaiKhuyenMai === "PERCENT" ? "%" : "đ"}<br>Từ ${UI.money(p.DonToiThieu)}đ${p.GiamToiDa ? `<br>Tối đa ${UI.money(p.GiamToiDa)}đ` : ""}</td><td>${p.DoiTuongApDung === "MEMBER" ? "Khách thành viên" : "Mọi khách"}<br><small>${UI.escape(p.TenChiNhanh || "Toàn chuỗi")}</small></td><td>${UI.date(p.NgayBatDau)}<br>→ ${UI.date(p.NgayKetThuc)}</td><td>${p.SoLuotDaDung || 0} / ${p.GioiHanLuotDung ?? "∞"}</td><td><span class="badge ${st.css}">${st.label}</span></td><td><button class="btn small-btn" onclick="UI.run(this,()=>YModule.togglePromo(${p.MaKhuyenMai},'${p.TrangThai === "active" ? "inactive" : "active"}'))">${p.TrangThai === "active" ? "Tắt voucher" : "Bật voucher"}</button> <button class="btn btn-red small-btn" onclick="UI.run(this,()=>YModule.deletePromo(${p.MaKhuyenMai},'${UI.escape(p.MaCode)}'))">Xóa</button></td></tr>`,
         )
-        .join("") || UI.empty(6);
+        .join("") ||
+      UI.empty(
+        7,
+        rows.length ? "Không có voucher khớp bộ lọc." : "Chưa có voucher.",
+      );
+  },
+  async deletePromo(id, code) {
+    if (!confirm(`Xóa voucher ${code}? Không thể hoàn tác.`)) return;
+    const r = await ApiClient.delete(`/promos/${id}`);
+    UI.notify(r.message);
+    await ManhModule.refresh();
   },
   async togglePromo(id, status) {
     const r = await ApiClient.put(`/promos/${id}/status`, {
@@ -218,8 +263,22 @@ const YModule = {
     await ManhModule.refresh();
   },
   hydrateCustomers(rows) {
+    this.customers = rows;
+    this.renderCustomers();
+  },
+  moveCustomerPage(delta) {
+    this.customerPage += delta;
+    this.renderCustomers();
+  },
+  renderCustomers() {
+    const page = UI.paginate(this.customers, this.customerPage, PAGE_SIZE);
+    this.customerPage = page.page;
+    UI.el("customerPager").innerHTML = UI.pagerHtml(
+      page,
+      "YModule.moveCustomerPage",
+    );
     UI.el("customerTableBody").innerHTML =
-      rows
+      page.items
         .map(
           (c) =>
             `<tr><td>${UI.escape(c.HoTen)}</td><td>${UI.escape(c.SoDienThoai)}</td><td>${c.DiemTichLuy}</td><td>${UI.money(c.TongChiTieu)}</td><td>${UI.escape(c.HangThanhVien)}</td></tr>`,
