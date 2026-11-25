@@ -39,7 +39,23 @@ const check = (condition, message) => {
         for (const batch of text.split(/^\s*GO\s*$/gim).filter((s) => s.trim()))
           await pool.request().batch(batch);
       }
-    check(true, "Schema/seed chạy lại không nhân đôi");
+    const shape = await pool.request().query(`
+      SELECT
+        (SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID(N'dbo')) AS TableCount,
+        (SELECT COUNT(*) FROM dbo.NhanVien) AS StaffCount,
+        (SELECT COUNT(*) FROM dbo.LichPhanCa) AS ScheduledCount,
+        (SELECT COUNT(*) FROM dbo.SanPham_Size) AS SizeCount,
+        (SELECT COUNT(*) FROM dbo.ChuongTrinhKhuyenMai) AS PromoCount,
+        (SELECT DoiTuongApDung FROM dbo.ChuongTrinhKhuyenMai WHERE MaCode='THANHVIEN15') AS Audience,
+        OBJECT_ID(N'dbo.HangDoiPhaChe_KDS',N'V') AS KdsView;
+    `);
+    const seeded = shape.recordset[0];
+    check(
+      seeded.TableCount === 20 && seeded.StaffCount === 17 &&
+        seeded.ScheduledCount === 96 && seeded.SizeCount === 12 &&
+        seeded.PromoCount === 6 && seeded.Audience === "MEMBER" && seeded.KdsView > 0,
+      "Đủ 20 bảng và view KDS, nạp đúng voucher thành viên, chạy lại seed không nhân đôi",
+    );
     const staffCounts = await pool
       .request()
       .query(
@@ -244,6 +260,13 @@ const check = (condition, message) => {
       TienMatThucTeCuoiCa: final.theoreticalCash,
     });
     check(true, "Chốt ca đúng số liệu");
+    await request("/shifts/open", { MaChiNhanh: b, TienMatDauCa: 0 }, 400);
+    await request("/shifts/open", {
+      MaChiNhanh: b,
+      TienMatDauCa: 0,
+      LyDoLechDauCa: "Nộp quỹ sau khi chốt ca trước",
+    });
+    check(true, "Mở ca sau cần lý do nếu tiền đầu ca khác tiền đếm ca trước");
     console.log(`PASS ${checks} nhóm kiểm tra SQL thật.`);
   } catch (error) {
     console.error("FAIL SQL integration:", error.message);

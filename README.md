@@ -32,27 +32,22 @@ Nâng cấp từ database v4 đã có: chạy lại `01_create_database.sql` (t�
 
 ## Cài đặt trong VS Code
 
-Cần Node.js từ 22 trở lên và SQL Server 2017 trở lên. Giải nén toàn bộ ZIP, mở thư mục có `package.json` trong VS Code.
+Cần Node.js từ 22 trở lên và SQL Server 2017 trở lên. Giải nén toàn bộ ZIP, mở thư mục có `package.json` trong VS Code. Sao chép `backend/.env` từ bản đang dùng hoặc tạo từ `backend/.env.example`, rồi xác nhận đúng `DB_SERVER`, `DB_USER` và `DB_PASSWORD`.
 
-1. Trong SSMS, chạy `database-sql/01_create_database.sql`, sau đó `02_insert_data.sql`. Database mới là **CoffeeChainCafeV4**.
-2. Tại terminal PowerShell ở thư mục gốc:
-
-```powershell
-Copy-Item backend\.env.example backend\.env
-npm install
-```
-
-3. Điền kết nối SQL Server thật trong `backend/.env`, giữ `DB_DATABASE=CoffeeChainCafeV4`.
-4. Kiểm tra và chạy:
+Mở PowerShell tại thư mục gốc và chạy từng lệnh:
 
 ```powershell
+npm ci
+npm run db:setup
 npm run db:check
 npm start
 ```
 
+`db:setup` tạo database demo `CoffeeChainCafeV4_KiotCafe`, nạp dữ liệu mẫu và cập nhật `DB_DATABASE` khi đã xác nhận 20 bảng và 1 view. Lệnh chạy qua kết nối SQL Server của backend. Khi báo lỗi kết nối, kiểm tra SQL Server đã bật TCP/IP và DB_PORT hoặc tên instance trong `.env`. Khi báo lỗi SQL, lệnh hiển thị batch, vị trí trong file và mã lỗi.
+
 Mở [http://localhost:5000](http://localhost:5000). Chủ chuỗi: **0900000000 / 999999**. Trang khách đặt món: [http://localhost:5000/order.html](http://localhost:5000/order.html).
 
-Không mở trực tiếp `frontend/index.html` bằng Live Server; backend phục vụ cả API và giao diện. Xem `docs/HUONG_DAN_VSCODE.md` để có đầy đủ tài khoản và kịch bản sử dụng.
+Backend phục vụ cả API và giao diện. Xem `docs/HUONG_DAN_VSCODE.md` để có đầy đủ tài khoản và kịch bản sử dụng.
 
 ## Phân ca
 
@@ -82,12 +77,14 @@ Két lý thuyết = tiền đầu ca + thu CASH − hoàn CASH + thu nội bộ 
 
 Schema/seed đều là phiên bản 4. Hai script có thể chạy lại cùng phiên bản mà không nhân đôi dữ liệu mẫu hoặc đặt lại PIN. Script từ chối schema khác phiên bản. Dùng trọn bộ code và SQL v4; database `CoffeeChainCafeV4` tách khỏi bản dự án cũ, không tự di chuyển dữ liệu cũ. Các bảng kho của database cũ không được sử dụng; schema mới không tạo chúng.
 
+`npm run db:check` kiểm tra 20 bảng, view KDS, cột đối tượng voucher và phiên bản của cả hai script. Nếu thiếu cấu trúc, chạy lại file 01 rồi chạy file 02. SQL mẫu được thiết kế cho SQL Server và có lệnh `GO` để phân tách batch trong SSMS.
+
 ```powershell
 npm run check
 npm test
 npm run test:sql
 ```
 
-`check` kiểm tra cú pháp/import/tài nguyên. `npm test`: **66 kiểm thử tự động đã đạt**, dùng tầng SQL giả lập. Đã kiểm tra **20 nhóm thao tác trình duyệt** với API fixture. Chưa chạy với SQL Server thật trong môi trường soạn mã; `test:sql` tạo database test riêng để nhóm xác nhận schema/seed và giao dịch thật. Xem `docs/KIEM_THU.md`.
+`check` kiểm tra cú pháp/import/tài nguyên. `npm test`: **70 kiểm thử tự động đã đạt**, dùng tầng SQL giả lập. `test:sql` tạo database test riêng để nhóm xác nhận schema/seed và giao dịch trên SQL Server. Xem `docs/KIEM_THU.md`.
 
 Thanh toán thẻ/chuyển khoản hiện do thu ngân xác nhận thủ công; chưa tích hợp cổng thanh toán, hóa đơn điện tử hay tính lương chính thức. Chấm công theo ca không xác minh vị trí GPS thực tế.

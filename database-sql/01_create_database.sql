@@ -4,7 +4,19 @@ IF DB_ID(N'CoffeeChainCafeV4') IS NULL EXEC(N'CREATE DATABASE CoffeeChainCafeV4'
 GO
 USE CoffeeChainCafeV4;
 GO
+-- Cố định cấu hình phiên cho các filtered index và cột có thể NULL.
+SET ANSI_NULLS ON;
+SET ANSI_NULL_DFLT_ON ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET QUOTED_IDENTIFIER ON;
+SET NUMERIC_ROUNDABORT OFF;
 SET XACT_ABORT ON;
+IF DB_NAME() <> N'CoffeeChainCafeV4'
+    THROW 50002, N'Không vào được database CoffeeChainCafeV4. Kiểm tra quyền và lỗi của lệnh USE.', 1;
+
 BEGIN TRY
 BEGIN TRANSACTION;
 IF OBJECT_ID(N'dbo.DonHang',N'U') IS NOT NULL
@@ -30,8 +42,8 @@ EXEC(N'CREATE TABLE dbo.ChiNhanh (
 IF OBJECT_ID(N'dbo.NhanVien',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.NhanVien (
     MaNhanVien INT IDENTITY PRIMARY KEY,
-    MaChiNhanh INT NULL REFERENCES ChiNhanh(MaChiNhanh),
-    MaVaiTro INT NOT NULL REFERENCES VaiTro(MaVaiTro),
+    MaChiNhanh INT NULL REFERENCES dbo.ChiNhanh(MaChiNhanh),
+    MaVaiTro INT NOT NULL REFERENCES dbo.VaiTro(MaVaiTro),
     HoTen NVARCHAR(100) NOT NULL,
     SoDienThoai VARCHAR(20),
     MaPINHash VARCHAR(180),
@@ -43,25 +55,25 @@ IF OBJECT_ID(N'dbo.CaLamViecMau',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.CaLamViecMau (MaCaMau INT IDENTITY PRIMARY KEY, TenCa NVARCHAR(80) NOT NULL UNIQUE, GioBatDau VARCHAR(5) NOT NULL, GioKetThuc VARCHAR(5) NOT NULL, QuaDem BIT NOT NULL DEFAULT 0);');
 
 IF OBJECT_ID(N'dbo.LichPhanCa',N'U') IS NULL
-EXEC(N'CREATE TABLE dbo.LichPhanCa (MaPhanCa INT IDENTITY PRIMARY KEY, MaChiNhanh INT NOT NULL REFERENCES ChiNhanh(MaChiNhanh), MaCaMau INT NULL REFERENCES CaLamViecMau(MaCaMau), MaNhanVien INT NOT NULL REFERENCES NhanVien(MaNhanVien), NgayLamViec DATE NOT NULL, BatDauLam DATETIME2 NOT NULL, KetThucLam DATETIME2 NOT NULL, ViTriLamViec NVARCHAR(40) NOT NULL CHECK(ViTriLamViec IN (N''Thu ngân'',N''Pha chế'',N''Phục vụ'',N''Quản lý ca'',N''Bếp'')), TrangThai VARCHAR(30) NOT NULL DEFAULT ''scheduled'' CHECK(TrangThai IN (''scheduled'',''Leave_Requested'',''Absent'',''cancelled'')), GhiChu NVARCHAR(500), LyDoNghi NVARCHAR(500), LyDoHuy NVARCHAR(500), NguoiTao INT NULL REFERENCES NhanVien(MaNhanVien), NguoiCapNhat INT NULL REFERENCES NhanVien(MaNhanVien), NgayCapNhat DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(), CHECK(KetThucLam>BatDauLam AND DATEDIFF(minute,BatDauLam,KetThucLam)<=1440));');
+EXEC(N'CREATE TABLE dbo.LichPhanCa (MaPhanCa INT IDENTITY PRIMARY KEY, MaChiNhanh INT NOT NULL REFERENCES dbo.ChiNhanh(MaChiNhanh), MaCaMau INT NULL REFERENCES dbo.CaLamViecMau(MaCaMau), MaNhanVien INT NOT NULL REFERENCES dbo.NhanVien(MaNhanVien), NgayLamViec DATE NOT NULL, BatDauLam DATETIME2 NOT NULL, KetThucLam DATETIME2 NOT NULL, ViTriLamViec NVARCHAR(40) NOT NULL CHECK(ViTriLamViec IN (N''Thu ngân'',N''Pha chế'',N''Phục vụ'',N''Quản lý ca'',N''Bếp'')), TrangThai VARCHAR(30) NOT NULL DEFAULT ''scheduled'' CHECK(TrangThai IN (''scheduled'',''Leave_Requested'',''Absent'',''cancelled'')), GhiChu NVARCHAR(500), LyDoNghi NVARCHAR(500), LyDoHuy NVARCHAR(500), NguoiTao INT NULL REFERENCES dbo.NhanVien(MaNhanVien), NguoiCapNhat INT NULL REFERENCES dbo.NhanVien(MaNhanVien), NgayCapNhat DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(), CHECK(KetThucLam>BatDauLam AND DATEDIFF(minute,BatDauLam,KetThucLam)<=1440));');
 
 IF OBJECT_ID(N'dbo.BangChamCong',N'U') IS NULL
-EXEC(N'CREATE TABLE dbo.BangChamCong (MaChamCong INT IDENTITY PRIMARY KEY, MaPhanCa INT NOT NULL UNIQUE REFERENCES LichPhanCa(MaPhanCa), MaNhanVien INT NOT NULL REFERENCES NhanVien(MaNhanVien), ThoiGianCheckIn DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(), ThoiGianCheckOut DATETIME2, SoGioLamThucTe DECIMAL(10,3), SoPhutDiTre INT NOT NULL DEFAULT 0, SoPhutVeSom INT NOT NULL DEFAULT 0, CHECK(ThoiGianCheckOut IS NULL OR ThoiGianCheckOut>=ThoiGianCheckIn));');
+EXEC(N'CREATE TABLE dbo.BangChamCong (MaChamCong INT IDENTITY PRIMARY KEY, MaPhanCa INT NOT NULL UNIQUE REFERENCES dbo.LichPhanCa(MaPhanCa), MaNhanVien INT NOT NULL REFERENCES dbo.NhanVien(MaNhanVien), ThoiGianCheckIn DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(), ThoiGianCheckOut DATETIME2, SoGioLamThucTe DECIMAL(10,3), SoPhutDiTre INT NOT NULL DEFAULT 0, SoPhutVeSom INT NOT NULL DEFAULT 0, CHECK(ThoiGianCheckOut IS NULL OR ThoiGianCheckOut>=ThoiGianCheckIn));');
 
 IF OBJECT_ID(N'dbo.MayPOS',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.MayPOS (
     MaMayPOS INT IDENTITY PRIMARY KEY,
-    MaChiNhanh INT NOT NULL REFERENCES ChiNhanh(MaChiNhanh),
+    MaChiNhanh INT NOT NULL REFERENCES dbo.ChiNhanh(MaChiNhanh),
     TenMay NVARCHAR(100) NOT NULL
 );');
 
 IF OBJECT_ID(N'dbo.PhienLamViecPOS',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.PhienLamViecPOS (
     MaPhienCa INT IDENTITY PRIMARY KEY,
-    MaMayPOS INT NOT NULL REFERENCES MayPOS(MaMayPOS),
-    MaChiNhanh INT NOT NULL REFERENCES ChiNhanh(MaChiNhanh),
-    ThuNganMoCa INT NOT NULL REFERENCES NhanVien(MaNhanVien),
-    ThuNganDongCa INT REFERENCES NhanVien(MaNhanVien),
+    MaMayPOS INT NOT NULL REFERENCES dbo.MayPOS(MaMayPOS),
+    MaChiNhanh INT NOT NULL REFERENCES dbo.ChiNhanh(MaChiNhanh),
+    ThuNganMoCa INT NOT NULL REFERENCES dbo.NhanVien(MaNhanVien),
+    ThuNganDongCa INT REFERENCES dbo.NhanVien(MaNhanVien),
     ThoiGianMo DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     ThoiGianDong DATETIME2,
     TienMatDauCa DECIMAL(18,2) NOT NULL CHECK(TienMatDauCa>=0),
@@ -80,11 +92,11 @@ EXEC(N'CREATE TABLE dbo.PhienLamViecPOS (
 IF OBJECT_ID(N'dbo.PhieuThuChiNoiBo',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.PhieuThuChiNoiBo (
     MaPhieu INT IDENTITY PRIMARY KEY,
-    MaPhienCa INT NOT NULL REFERENCES PhienLamViecPOS(MaPhienCa),
+    MaPhienCa INT NOT NULL REFERENCES dbo.PhienLamViecPOS(MaPhienCa),
     LoaiPhieu VARCHAR(3) NOT NULL CHECK(LoaiPhieu IN (''THU'',''CHI'')),
     SoTien DECIMAL(18,2) NOT NULL CHECK(SoTien>0),
     LyDo NVARCHAR(500) NOT NULL,
-    NguoiTao INT NOT NULL REFERENCES NhanVien(MaNhanVien),
+    NguoiTao INT NOT NULL REFERENCES dbo.NhanVien(MaNhanVien),
     NgayTao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
 );');
 
@@ -97,7 +109,7 @@ EXEC(N'CREATE TABLE dbo.DanhMuc (
 IF OBJECT_ID(N'dbo.SanPham',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.SanPham (
     MaSanPham INT IDENTITY PRIMARY KEY,
-    MaDanhMuc INT NOT NULL REFERENCES DanhMuc(MaDanhMuc),
+    MaDanhMuc INT NOT NULL REFERENCES dbo.DanhMuc(MaDanhMuc),
     TenSanPham NVARCHAR(150) NOT NULL, LoaiSanPham VARCHAR(10) NOT NULL DEFAULT ''DO_UONG'' CHECK(LoaiSanPham IN (''DO_UONG'',''MON_AN'')),
     GiaBanCoBan DECIMAL(18,2) NOT NULL CHECK(GiaBanCoBan>0),
     HinhAnh NVARCHAR(500),
@@ -107,7 +119,7 @@ EXEC(N'CREATE TABLE dbo.SanPham (
 
 IF OBJECT_ID(N'dbo.SanPham_Size',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.SanPham_Size (
-    MaSanPham INT NOT NULL REFERENCES SanPham(MaSanPham),
+    MaSanPham INT NOT NULL REFERENCES dbo.SanPham(MaSanPham),
     TenSize VARCHAR(10) NOT NULL CHECK(TenSize IN (''S'',''M'',''L'',''PHAN'')),
     GiaBan DECIMAL(18,2) NOT NULL CHECK(GiaBan>0),
     PRIMARY KEY(MaSanPham,TenSize)
@@ -126,7 +138,7 @@ EXEC(N'CREATE TABLE dbo.KhachHang (
 IF OBJECT_ID(N'dbo.ChuongTrinhKhuyenMai',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.ChuongTrinhKhuyenMai (
     MaKhuyenMai INT IDENTITY PRIMARY KEY,
-    MaCode VARCHAR(40) NOT NULL UNIQUE, DoiTuongApDung VARCHAR(10) NOT NULL DEFAULT ''ALL'' CHECK(DoiTuongApDung IN (''ALL'',''MEMBER'')), MaChiNhanh INT NULL REFERENCES ChiNhanh(MaChiNhanh), GioiHanLuotDung INT NULL CHECK(GioiHanLuotDung>0), SoLuotDaDung INT NOT NULL DEFAULT 0 CHECK(SoLuotDaDung>=0),
+    MaCode VARCHAR(40) NOT NULL UNIQUE, DoiTuongApDung VARCHAR(10) NOT NULL DEFAULT ''ALL'' CHECK(DoiTuongApDung IN (''ALL'',''MEMBER'')), MaChiNhanh INT NULL REFERENCES dbo.ChiNhanh(MaChiNhanh), GioiHanLuotDung INT NULL CHECK(GioiHanLuotDung>0), SoLuotDaDung INT NOT NULL DEFAULT 0 CHECK(SoLuotDaDung>=0),
     TenChuongTrinh NVARCHAR(150) NOT NULL,
     LoaiKhuyenMai VARCHAR(10) NOT NULL CHECK(LoaiKhuyenMai IN (''PERCENT'',''FIXED'')),
     GiaTriGiam DECIMAL(18,2) NOT NULL CHECK(GiaTriGiam>0),
@@ -145,11 +157,11 @@ EXEC(N'CREATE TABLE dbo.DonHang (
     MaDonHang INT IDENTITY PRIMARY KEY,
     MaDonHienThi VARCHAR(40) NOT NULL UNIQUE,
     SoThuTuGoiMon INT NOT NULL,
-    MaChiNhanh INT NOT NULL REFERENCES ChiNhanh(MaChiNhanh),
-    MaPhienCa INT REFERENCES PhienLamViecPOS(MaPhienCa),
-    MaNhanVienTao INT REFERENCES NhanVien(MaNhanVien),
-    MaKhachHang INT REFERENCES KhachHang(MaKhachHang),
-    MaKhuyenMai INT REFERENCES ChuongTrinhKhuyenMai(MaKhuyenMai),
+    MaChiNhanh INT NOT NULL REFERENCES dbo.ChiNhanh(MaChiNhanh),
+    MaPhienCa INT REFERENCES dbo.PhienLamViecPOS(MaPhienCa),
+    MaNhanVienTao INT REFERENCES dbo.NhanVien(MaNhanVien),
+    MaKhachHang INT REFERENCES dbo.KhachHang(MaKhachHang),
+    MaKhuyenMai INT REFERENCES dbo.ChuongTrinhKhuyenMai(MaKhuyenMai),
     IdempotencyKey VARCHAR(36) NOT NULL UNIQUE,
     YeuCauHash VARCHAR(64) NOT NULL,
     KenhBan VARCHAR(3) NOT NULL CHECK(KenhBan IN (''POS'',''APP'')),
@@ -169,8 +181,8 @@ EXEC(N'CREATE TABLE dbo.DonHang (
 IF OBJECT_ID(N'dbo.ChiTietDonHang',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.ChiTietDonHang (
     MaChiTietDon INT IDENTITY PRIMARY KEY,
-    MaDonHang INT NOT NULL REFERENCES DonHang(MaDonHang),
-    MaSanPham INT NOT NULL REFERENCES SanPham(MaSanPham),
+    MaDonHang INT NOT NULL REFERENCES dbo.DonHang(MaDonHang),
+    MaSanPham INT NOT NULL REFERENCES dbo.SanPham(MaSanPham),
     TenSanPhamLuuTru NVARCHAR(150) NOT NULL,
     TenSize VARCHAR(10) NOT NULL,
     SoLuong INT NOT NULL CHECK(SoLuong>0),
@@ -185,14 +197,14 @@ EXEC(N'CREATE TABLE dbo.ChiTietDonHang (
 IF OBJECT_ID(N'dbo.GiaoDichThanhToan',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.GiaoDichThanhToan (
     MaGiaoDich INT IDENTITY PRIMARY KEY,
-    MaDonHang INT NOT NULL REFERENCES DonHang(MaDonHang),
-    MaPhienCa INT NOT NULL REFERENCES PhienLamViecPOS(MaPhienCa),
+    MaDonHang INT NOT NULL REFERENCES dbo.DonHang(MaDonHang),
+    MaPhienCa INT NOT NULL REFERENCES dbo.PhienLamViecPOS(MaPhienCa),
     PhuongThuc VARCHAR(10) NOT NULL CHECK(PhuongThuc IN (''CASH'',''CARD'',''TRANSFER'')),
     LoaiGiaoDich VARCHAR(10) NOT NULL DEFAULT ''PAYMENT'' CHECK(LoaiGiaoDich IN (''PAYMENT'',''REFUND'')),
     SoTienThanhToan DECIMAL(18,2) NOT NULL CHECK(SoTienThanhToan>=0),
     TienKhachDua DECIMAL(18,2) NOT NULL DEFAULT 0,
     TienThuaTraKhach DECIMAL(18,2) NOT NULL DEFAULT 0,
-    NguoiTao INT NOT NULL REFERENCES NhanVien(MaNhanVien),
+    NguoiTao INT NOT NULL REFERENCES dbo.NhanVien(MaNhanVien),
     ThoiGian DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     UNIQUE(MaDonHang,LoaiGiaoDich)
 );');
@@ -200,7 +212,7 @@ EXEC(N'CREATE TABLE dbo.GiaoDichThanhToan (
 IF OBJECT_ID(N'dbo.PhienDangNhap',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.PhienDangNhap (
     TokenHash VARCHAR(64) PRIMARY KEY,
-    MaNhanVien INT NOT NULL REFERENCES NhanVien(MaNhanVien),
+    MaNhanVien INT NOT NULL REFERENCES dbo.NhanVien(MaNhanVien),
     HetHan DATETIME2 NOT NULL
 );');
 
@@ -209,8 +221,8 @@ EXEC(N'CREATE TABLE dbo.Topping (MaTopping INT IDENTITY PRIMARY KEY, TenTopping 
 
 IF OBJECT_ID(N'dbo.ChiTietDon_Topping',N'U') IS NULL
 EXEC(N'CREATE TABLE dbo.ChiTietDon_Topping (
-    MaChiTietDon INT NOT NULL REFERENCES ChiTietDonHang(MaChiTietDon),
-    MaTopping INT NOT NULL REFERENCES Topping(MaTopping),
+    MaChiTietDon INT NOT NULL REFERENCES dbo.ChiTietDonHang(MaChiTietDon),
+    MaTopping INT NOT NULL REFERENCES dbo.Topping(MaTopping),
     TenToppingLuuTru NVARCHAR(100) NOT NULL,
     DonGia DECIMAL(18,2) NOT NULL CHECK(DonGia>=0),
     SoLuong INT NOT NULL CHECK(SoLuong BETWEEN 1 AND 5),
